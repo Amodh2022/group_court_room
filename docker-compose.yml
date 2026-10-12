@@ -1,0 +1,81 @@
+services:
+  db:
+    image: postgres:16-alpine
+    environment:
+      POSTGRES_USER: gcc
+      POSTGRES_PASSWORD: gcc
+      POSTGRES_DB: gcc
+    ports: ["5433:5432"]
+    volumes: ["gcc_pgdata:/var/lib/postgresql/data"]
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U gcc -d gcc"]
+      interval: 3s
+      timeout: 3s
+      retries: 20
+
+  api:
+    build: ./backend
+    env_file: [.env]
+    environment:
+      DATABASE_URL: postgresql+psycopg://gcc:gcc@db:5432/gcc
+      API_BASE_URL: ${API_BASE_URL:-http://localhost:8000}
+      RUN_JOBS_INLINE: "false"
+      OLLAMA_BASE_URL: http://ollama:11434
+    depends_on:
+      db: {condition: service_healthy}
+      ollama: {condition: service_healthy}
+    ports: ["8000:8000"]
+    command: >
+      sh -c "alembic upgrade head &&
+             uvicorn app.main:app --host 0.0.0.0 --port 8000"
+
+  worker:
+    build: ./backend
+    env_file: [.env]
+    environment:
+      DATABASE_URL: postgresql+psycopg://gcc:gcc@db:5432/gcc
+      # The API process runs single-process convenience draining; with a
+      # dedicated worker the API should only enqueue.
+      RUN_JOBS_INLINE: "false"
+      OLLAMA_BASE_URL: http://ollama:11434
+    depends_on:
+      db: {condition: service_healthy}
+      ollama: {condition: service_healthy}
+    command: python -m app.services.job_runner
+
+  ollama:
+    # Pinned to the host ollama version: 0.40.x writes a manifests-v2
+    # layout and cannot read the manifests/ tree the host wrote, so a
+    # newer image sees an empty model list from the shared store.
+    image: ollama/ollama:0.21.2
+    # Deliberately no `ports:` — the model server is reachable only from the
+    # compose network, never from the host's LAN.
+    runtime: nvidia
+    environment:
+      NVIDIA_VISIBLE_DEVICES: all
+      NVIDIA_DRIVER_CAPABILITIES: compute,utility
+    volumes:
+      # A copy of the host ollama model store. It cannot be mounted from
+      # /usr/share/ollama directly: docker here is the snap package, and snap
+      # confinement turns a bind mount of a path outside $HOME into an empty
+      # directory silently, with no error. Refresh after a host `ollama pull`:
+      #   cp -r /usr/share/ollama/.ollama/models/. ~/ollama-docker/models/
+      - ${HOME}/ollama-docker/models:/root/.ollama/models
+    healthcheck:
+      test: ["CMD-SHELL", "ollama list >/dev/null 2>&1 || exit 1"]
+      interval: 5s
+      timeout: 5s
+      retries: 30
+      start_period: 20s
+
+  web:
+    build: ./web
+    environment:
+      # Vite inlines this at build time; the browser talks to the API directly,
+      # so it must be an address the *browser* can reach, not a compose name.
+      VITE_API_BASE_URL: ${VITE_API_BASE_URL:-http://localhost:8000}
+    depends_on: [api]
+    ports: ["5173:5173"]
+
+volumes:
+  gcc_pgdata:
