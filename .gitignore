@@ -8,3 +8,7 @@ dist/
 *.db
 .dart_tool/
 build/
+
+# Firebase admin keys (never commit)
+*firebase*adminsdk*.json
+*-firebase-admin.json

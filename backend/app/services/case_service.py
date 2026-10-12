@@ -6,7 +6,7 @@ import logging
 import uuid
 from datetime import timedelta
 
-from sqlalchemy import select, update
+from sqlalchemy import delete, select, update
 from sqlalchemy.exc import IntegrityError
 from sqlalchemy.orm import Session, selectinload
 
@@ -17,6 +17,7 @@ from app.models import (
     CaseMember,
     CaseStatus,
     JobStatus,
+    Notification,
     Participant,
     ParticipantRole,
     Submission,
@@ -183,6 +184,10 @@ def delete_case(db: Session, case: Case) -> None:
     case.jury_closed_at = now
     for p in case.participants:
         p.invite_token_hash = None
+    # Everyone seated on the case loses it at once: their notifications and
+    # "shared with me" rows go, and with them their per-member access tokens.
+    db.execute(delete(Notification).where(Notification.case_id == case.id))
+    db.execute(delete(CaseMember).where(CaseMember.case_id == case.id))
     db.commit()
     logger.info("case.deleted", extra={"case_id": str(case.id)})
 

@@ -212,3 +212,102 @@ async def room(ws: WebSocket) -> None:
         pass
     finally:
         hub.leave(seat.case_id, conn)
+
+
+# --- notifications ----------------------------------------------------------
+
+
+def _signature(db, user_id: uuid.UUID) -> tuple[int, int, int, str | None]:
+    """(unread, total notifications, shared cases, text of the newest notification)."""
+    from sqlalchemy import func, select
+
+    from app.models import CaseMember, Notification
+
+    unread = db.execute(
+        select(func.count()).select_from(Notification).where(
+            Notification.user_id == user_id, Notification.read.is_(False)
+        )
+    ).scalar_one()
+    total = db.execute(
+        select(func.count()).select_from(Notification).where(Notification.user_id == user_id)
+    ).scalar_one()
+    shared = db.execute(
+        select(func.count()).select_from(CaseMember).where(CaseMember.user_id == user_id)
+    ).scalar_one()
+    newest = db.execute(
+        select(Notification.text)
+        .where(Notification.user_id == user_id)
+        .order_by(Notification.created_at.desc())
+        .limit(1)
+    ).scalar_one_or_none()
+    return unread, total, shared, newest
+
+
+def _notification_state(db, token: str):
+    """(user id, signature) for a bearer token, or None if it isn't valid."""
+    from fastapi import HTTPException
+
+    from app.security.auth import user_from_token
+
+    try:
+        user = user_from_token(db, token)
+    except HTTPException:
+        return None
+    return user.id, _signature(db, user.id)
+
+
+_notification_auth = _in_session(_notification_state)
+_notification_poll = _in_session(_signature)
+
+
+@router.websocket("/ws/notifications")
+async def notifications(ws: WebSocket) -> None:
+    """Tell a signed-in user the moment their notifications change.
+
+    The first frame is `{"type": "auth", "token": ...}`. After that the server
+    sends `{"type": "notifications", "unread": n, "shared": m, "latest": text|null}` on connect and again whenever
+    the count of notifications or unread ones changes; the client refetches the
+    list. Checking the table on a short timer keeps this correct across API
+    processes without a message bus.
+    """
+    await ws.accept()
+    try:
+        first = await asyncio.wait_for(ws.receive_json(), AUTH_TIMEOUT)
+        if not isinstance(first, dict) or first.get("type") != "auth":
+            raise ValueError
+    except (TimeoutError, ValueError, WebSocketDisconnect):
+        with contextlib.suppress(Exception):
+            await ws.close(code=CLOSE_BAD_REQUEST)
+        return
+
+    state = await _notification_auth(str(first.get("token", "")))
+    if state is None:
+        with contextlib.suppress(Exception):
+            await _send(ws, type="error", code="unauthorized", message="Sign in again.")
+            await ws.close(code=CLOSE_UNAUTHORIZED)
+        return
+
+    user_id, last = state
+    try:
+        await _send(ws, type="notifications", unread=last[0], shared=last[2])
+        since_ping = 0.0
+        while True:
+            await asyncio.sleep(TICK)
+            current = await _notification_poll(user_id)
+            if current != last:
+                # A toast only for something genuinely new, not for a delete or a read.
+                latest = current[3] if current[1] > last[1] else None
+                last = current
+                since_ping = 0.0
+                await _send(
+                    ws, type="notifications", unread=current[0], shared=current[2], latest=latest
+                )
+            else:
+                since_ping += TICK
+                if since_ping >= PING_EVERY:
+                    since_ping = 0.0
+                    await _send(ws, type="ping")
+    except WebSocketDisconnect:
+        pass
+    except Exception as exc:  # noqa: BLE001 - a dropped socket must never surface as a 500
+        logger.warning("ws.notifications_closed", extra={"error": type(exc).__name__})

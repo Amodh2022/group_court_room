@@ -241,7 +241,7 @@ class CourtDisclaimer extends StatelessWidget {
     padding: const EdgeInsets.symmetric(vertical: 24, horizontal: 8),
     child: Text(
       text ??
-          'Group Chat Court is a comedy game. Verdicts are entertainment — '
+          'Sue Me is a comedy game. Verdicts are entertainment — '
               'not a finding of fact, and not legal advice.',
       textAlign: TextAlign.center,
       style: context.text.bodySmall?.copyWith(color: context.palette.inkDim),

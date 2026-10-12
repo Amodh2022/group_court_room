@@ -25,7 +25,7 @@ class DashboardScreen extends ConsumerWidget {
     final name = ref.watch(authControllerProvider).valueOrNull?.displayName;
 
     return CourtScaffold(
-      title: 'Group Chat Court',
+      title: 'Sue Me',
       tab: CourtTab.home,
       maxWidth: 1000,
       actions: const [NotificationBell()],

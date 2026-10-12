@@ -278,4 +278,15 @@ class ApiClient {
     () => _dio.post('/api/v1/notifications/read-all', options: _options),
     (_) {},
   );
+
+  /// Tells the server where to push notifications for this device.
+  Future<void> registerDevice(String token, {String platform = 'android'}) =>
+      _send(
+        () => _dio.post(
+          '/api/v1/devices',
+          data: {'token': token, 'platform': platform},
+          options: _options,
+        ),
+        (_) {},
+      );
 }

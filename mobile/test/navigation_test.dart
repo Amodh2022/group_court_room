@@ -69,7 +69,7 @@ void main() {
     testWidgets('a restored session lands on the dashboard', (tester) async {
       final router = await pumpApp(tester, signedIn: true);
       expect(router.state.matchedLocation, '/');
-      expect(find.text('Group Chat Court'), findsWidgets);
+      expect(find.text('Sue Me'), findsWidgets);
     });
 
     testWidgets('signing in moves the user to the dashboard', (tester) async {

@@ -1,0 +1,15 @@
+# Optional: enable FCM push delivery.
+#   docker compose -f docker-compose.yml -f docker-compose.push.yml up -d
+# Needs a Firebase service-account key at ~/secrets/sue-me-firebase-admin.json
+# (override the host path with FIREBASE_KEY_FILE). Never commit that file.
+services:
+  api:
+    environment:
+      FIREBASE_CREDENTIALS: /run/secrets/firebase.json
+    volumes:
+      - ${FIREBASE_KEY_FILE:-${HOME}/secrets/sue-me-firebase-admin.json}:/run/secrets/firebase.json:ro
+  worker:
+    environment:
+      FIREBASE_CREDENTIALS: /run/secrets/firebase.json
+    volumes:
+      - ${FIREBASE_KEY_FILE:-${HOME}/secrets/sue-me-firebase-admin.json}:/run/secrets/firebase.json:ro

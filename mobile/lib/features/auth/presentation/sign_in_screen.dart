@@ -83,7 +83,7 @@ class _SignInScreenState extends ConsumerState<SignInScreen> {
                       ),
                       const SizedBox(height: 22),
                       Text(
-                        'Group Chat Court',
+                        'Sue Me',
                         textAlign: TextAlign.center,
                         style: context.text.titleMedium,
                       ),

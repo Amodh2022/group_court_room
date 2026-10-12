@@ -142,3 +142,59 @@ def test_direct_members_without_court_creator_only(client, make_case):
                        json={"user_id": c["user_id"], "role": "bogus"}, headers=ha).status_code == 422
     assert client.get("/api/v1/cases/shared", headers=hb).json()[0]["role"] == "juror"
     assert client.get("/api/v1/cases/shared", headers=hc).json()[0]["link_kind"] == "invite"
+
+
+def test_notifications_socket_pushes_changes(client, auth_headers):
+    from app.db.session import SessionLocal
+    from app.models import User
+    from app.services import social_service
+
+    headers = auth_headers(name="Sam")
+    token = headers["Authorization"].split(" ", 1)[1]
+    with client.websocket_connect("/api/v1/ws/notifications") as ws:
+        ws.send_json({"type": "auth", "token": token})
+        assert ws.receive_json()["unread"] == 0
+
+        me = client.get("/api/v1/auth/me", headers=headers).json()["user_id"]
+        db = SessionLocal()
+        try:
+            user = db.get(User, __import__("uuid").UUID(me))
+            social_service.notify(db, user.id, "added_to_court", "You were added to a court")
+            db.commit()
+        finally:
+            db.close()
+        frame = ws.receive_json()
+        assert frame["unread"] == 1 and frame["latest"] == "You were added to a court"
+
+
+def test_notifications_socket_rejects_bad_token(client):
+    with client.websocket_connect("/api/v1/ws/notifications") as ws:
+        ws.send_json({"type": "auth", "token": "nope"})
+        assert ws.receive_json()["type"] == "error"
+
+
+def test_deleting_a_case_removes_it_for_everyone_seated_on_it(client, auth_headers):
+    owner = auth_headers(name="Owner")
+    friend = auth_headers(name="Friend")
+    friend_id = client.get("/api/v1/auth/me", headers=friend).json()["user_id"]
+    case = client.post(
+        "/api/v1/cases",
+        json={
+            "title": "Pizza", "category": "food", "defendant_nickname": "Bob",
+            "accusation": "He ate the last slice right after saying he was full.",
+        },
+        headers=owner,
+    ).json()
+    res = client.post(
+        f"/api/v1/cases/{case['id']}/members",
+        json={"user_id": friend_id, "role": "juror"},
+        headers=owner,
+    )
+    assert res.status_code == 204
+    assert len(client.get("/api/v1/cases/shared", headers=friend).json()) == 1
+    assert client.get("/api/v1/notifications", headers=friend).json()["unread"] == 1
+
+    assert client.delete(f"/api/v1/cases/{case['id']}", headers=owner).status_code == 204
+
+    assert client.get("/api/v1/cases/shared", headers=friend).json() == []
+    assert client.get("/api/v1/notifications", headers=friend).json()["items"] == []

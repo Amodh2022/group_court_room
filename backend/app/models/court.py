@@ -87,3 +87,4 @@ class Notification(Base):
     read: Mapped[bool] = mapped_column(Boolean, default=False)
     created_at: Mapped[datetime] = created_at_column()
     read_at: Mapped[datetime | None] = mapped_column(TimestampTZ, nullable=True)
+

@@ -96,6 +96,12 @@ class Settings(BaseSettings):
     job_max_attempts: int = 3
     job_stale_seconds: int = 120
 
+    # Push (FCM) -----------------------------------------------------------
+    # Path to a Firebase service-account JSON. Unset/missing = pushes are skipped.
+    firebase_credentials: str | None = None
+    # Max pushes per user per rolling 24h (counted from in-app notifications).
+    push_daily_cap: int = 20
+
     @property
     def cors_origins(self) -> list[str]:
         extra = [o.strip() for o in self.extra_cors_origins.split(",") if o.strip()]

@@ -91,8 +91,7 @@ class InviteScreen extends ConsumerWidget {
                                   'You have been summoned to Group Chat '
                                   'Court: "${created!.title}". '
                                   'Defend yourself: $url',
-                              subject:
-                                  'Group Chat Court — you have been summoned',
+                              subject: 'Sue Me — you have been summoned',
                             ),
                           ),
                         ),
@@ -112,10 +111,9 @@ class InviteScreen extends ConsumerWidget {
                               ShareParams(
                                 text:
                                     'Jury duty: "${created!.title}" is in '
-                                    'Group Chat Court. Vote before the '
+                                    'Sue Me. Vote before the '
                                     'verdict drops: $juryUrl',
-                                subject:
-                                    'Group Chat Court — you are on the jury',
+                                subject: 'Sue Me — you are on the jury',
                               ),
                             ),
                           ),

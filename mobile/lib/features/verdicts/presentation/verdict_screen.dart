@@ -179,7 +179,7 @@ class _VerdictViewState extends ConsumerState<_VerdictView> {
       await SharePlus.instance.share(
         ShareParams(
           text: '${widget.verdict.shareCaption} ${link.url}',
-          subject: 'Group Chat Court — the verdict is in',
+          subject: 'Sue Me — the verdict is in',
         ),
       );
     } on ApiException catch (error) {

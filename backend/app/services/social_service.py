@@ -21,7 +21,7 @@ from app.models import (
     User,
 )
 from app.security.tokens import generate_token
-from app.services import errors
+from app.services import errors, push_service
 
 # --- handles ---------------------------------------------------------------
 
@@ -75,6 +75,8 @@ def notify(
         id=uuid.uuid4(), user_id=user_id, kind=kind, text=text,
         case_id=case_id, court_id=court_id,
     ))
+    # Delivered after the surrounding transaction commits (see push_service).
+    push_service.queue(db, user_id, text, kind=kind, case_id=case_id, court_id=court_id)
 
 
 # --- courts ----------------------------------------------------------------

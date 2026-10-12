@@ -6,9 +6,21 @@ import 'core/router.dart';
 import 'core/splash.dart';
 import 'core/theme.dart';
 import 'features/auth/data/auth_providers.dart';
+import 'features/notifications/data/live_notifications.dart';
+import 'features/notifications/data/push_bootstrap.dart';
 
-void main() {
-  runApp(const ProviderScope(child: GroupChatCourtApp()));
+Future<void> main() async {
+  WidgetsFlutterBinding.ensureInitialized();
+  final firebase = await initFirebase();
+  runApp(
+    ProviderScope(
+      child: LiveNotifications(
+        child: firebase
+            ? const PushBootstrap(child: GroupChatCourtApp())
+            : const GroupChatCourtApp(),
+      ),
+    ),
+  );
 }
 
 class GroupChatCourtApp extends ConsumerWidget {
@@ -25,7 +37,7 @@ class GroupChatCourtApp extends ConsumerWidget {
     // token and render an error.
     if (!ref.watch(authResolvedProvider)) {
       return MaterialApp(
-        title: 'Group Chat Court',
+        title: 'Sue Me',
         debugShowCheckedModeBanner: false,
         theme: themes.light,
         darkTheme: themes.dark,
@@ -35,7 +47,7 @@ class GroupChatCourtApp extends ConsumerWidget {
     }
 
     return MaterialApp.router(
-      title: 'Group Chat Court',
+      title: 'Sue Me',
       debugShowCheckedModeBanner: false,
       theme: themes.light,
       darkTheme: themes.dark,

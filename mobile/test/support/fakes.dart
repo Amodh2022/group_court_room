@@ -195,6 +195,14 @@ class FakeApiClient implements ApiClient {
   @override
   Future<List<SharedCase>> sharedCases() async => shared;
 
+  String? registeredDevice;
+
+  @override
+  Future<void> registerDevice(
+    String token, {
+    String platform = 'android',
+  }) async => registeredDevice = token;
+
   @override
   Future<NotificationFeed> notifications() async => feed;
 

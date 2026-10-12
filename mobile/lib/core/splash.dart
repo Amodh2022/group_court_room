@@ -20,7 +20,7 @@ class SplashScreen extends StatelessWidget {
           const Text('⚖️', style: TextStyle(fontSize: 56)),
           const SizedBox(height: 20),
           Text(
-            'GROUP CHAT COURT',
+            'SUE ME',
             style: context.text.labelSmall?.copyWith(fontSize: 13),
           ),
           const SizedBox(height: 28),

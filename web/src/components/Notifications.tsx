@@ -1,7 +1,8 @@
 import { useCallback, useEffect, useRef, useState } from "react";
 import { useNavigate } from "react-router-dom";
 
-import { api, type AppNotification } from "../lib/api";
+import { API_BASE_URL, api, type AppNotification } from "../lib/api";
+import { session } from "../lib/session";
 import { IconBell } from "./Icons";
 
 export function destinationOf(n: AppNotification): string | null {
@@ -35,6 +36,44 @@ export function NotificationBell() {
     load();
     const timer = window.setInterval(load, 60_000);
     return () => window.clearInterval(timer);
+  }, [load]);
+
+  // Live updates: the server tells us when anything changes, then we refetch.
+  // The 60s poll above stays as the fallback if the socket can't connect.
+  useEffect(() => {
+    if (typeof WebSocket === "undefined") return;
+    let closed = false;
+    let socket: WebSocket | undefined;
+    let retry: number | undefined;
+    let attempt = 0;
+
+    const connect = () => {
+      const token = session.token;
+      if (closed || !token) return;
+      socket = new WebSocket(`${API_BASE_URL.replace(/^http/, "ws")}/api/v1/ws/notifications`);
+      socket.onopen = () => socket?.send(JSON.stringify({ type: "auth", token }));
+      socket.onmessage = (event) => {
+        try {
+          if (JSON.parse(String(event.data)).type === "notifications") {
+            attempt = 0;
+            load();
+          }
+        } catch {
+          /* ignore malformed frames */
+        }
+      };
+      socket.onclose = (event) => {
+        if (closed || event.code === 4401) return;
+        retry = window.setTimeout(connect, Math.min(1000 * 2 ** attempt++, 15_000));
+      };
+    };
+
+    connect();
+    return () => {
+      closed = true;
+      window.clearTimeout(retry);
+      socket?.close();
+    };
   }, [load]);
 
   useEffect(() => {

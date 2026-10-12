@@ -1,4 +1,4 @@
-package ai.groupchatcourt.group_chat_court
+package app.sueme.app
 
 import io.flutter.embedding.android.FlutterActivity
 

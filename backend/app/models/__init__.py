@@ -1,6 +1,7 @@
 from app.models.case import Case
 from app.models.chat import ChatMessage
 from app.models.court import CaseMember, Court, CourtMember, Notification
+from app.models.device import DeviceToken
 from app.models.enums import (
     CASE_CATEGORIES,
     CaseStatus,
@@ -25,6 +26,7 @@ __all__ = [
     "ChatMessage",
     "Court",
     "CourtMember",
+    "DeviceToken",
     "JobStatus",
     "JuryVote",
     "JuryVoteKind",

@@ -1,0 +1,29 @@
+{
+  "project_info": {
+    "project_number": "708152223113",
+    "project_id": "sue-me-f8c08",
+    "storage_bucket": "sue-me-f8c08.firebasestorage.app"
+  },
+  "client": [
+    {
+      "client_info": {
+        "mobilesdk_app_id": "1:708152223113:android:f7d0913ddded85a7796d58",
+        "android_client_info": {
+          "package_name": "app.sueme.app"
+        }
+      },
+      "oauth_client": [],
+      "api_key": [
+        {
+          "current_key": "AIzaSyBAFVFqwQQD--pVd88SQd3DguQSctIaK2U"
+        }
+      ],
+      "services": {
+        "appinvite_service": {
+          "other_platform_oauth_client": []
+        }
+      }
+    }
+  ],
+  "configuration_version": "1"
+}
