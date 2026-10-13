@@ -14,8 +14,8 @@ class SectionLabel extends StatelessWidget {
       Text(text, style: context.text.titleMedium);
 }
 
-/// A white card that floats on the page, like the reference's panels: a broad,
-/// soft shadow and a hairline edge instead of a heavy border.
+/// A card as a physical tile: a thick ink border and a hard offset shadow,
+/// rather than the soft floating panel this used to be.
 class CourtCard extends StatelessWidget {
   const CourtCard({super.key, required this.child, this.padding});
 
@@ -24,16 +24,17 @@ class CourtCard extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) => Container(
-    decoration: BoxDecoration(
-      color: Theme.of(context).colorScheme.surfaceContainerHighest,
-      borderRadius: BorderRadius.circular(24),
-      boxShadow: courtShadow(context),
-    ),
+    decoration: courtChunk(context, radius: courtRadiusLg),
     child: Padding(padding: padding ?? const EdgeInsets.all(20), child: child),
   );
 }
 
 /// The verdict stamp, slammed down on reveal.
+///
+/// Drawn to the canvas: the ruling's own colour as a solid block, a thick
+/// black rim and a hard shadow, tilted six degrees off true. A long label
+/// such as INSUFFICIENT EVIDENCE shrinks to fit rather than wrapping — a
+/// stamp that wraps stops looking like a stamp.
 class VerdictStamp extends StatelessWidget {
   const VerdictStamp({super.key, required this.verdict, this.animate = false});
 
@@ -42,25 +43,32 @@ class VerdictStamp extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    final isLong = verdict == VerdictKind.insufficientEvidence;
     final stamp = Transform.rotate(
-      angle: -0.061, // ~3.5 degrees, as on the web card
+      angle: -0.105, // six degrees, as on the canvas
       child: Container(
-        padding: const EdgeInsets.symmetric(horizontal: 18, vertical: 10),
+        padding: const EdgeInsets.fromLTRB(24, 4, 24, 8),
         decoration: BoxDecoration(
-          border: Border.all(color: verdict.color, width: 4),
-          borderRadius: BorderRadius.circular(10),
+          color: verdict.color,
+          borderRadius: BorderRadius.circular(courtRadius),
+          border: Border.all(color: Colors.black, width: 4),
+          boxShadow: const [
+            BoxShadow(color: Colors.black, offset: Offset(0, 7)),
+          ],
         ),
-        child: Text(
-          verdict.label,
-          key: const Key('verdict-stamp'),
-          textAlign: TextAlign.center,
-          style: TextStyle(
-            fontFamily: courtDisplayFont,
-            fontWeight: FontWeight.w800,
-            fontSize: isLong ? 20 : 32,
-            letterSpacing: 2,
-            color: verdict.color,
+        child: FittedBox(
+          fit: BoxFit.scaleDown,
+          child: Text(
+            verdict.label,
+            key: const Key('verdict-stamp'),
+            textAlign: TextAlign.center,
+            style: const TextStyle(
+              fontFamily: courtDisplayFont,
+              fontWeight: FontWeight.w700,
+              fontSize: 64,
+              letterSpacing: 4,
+              height: 1.05,
+              color: Colors.white,
+            ),
           ),
         ),
       ),

@@ -1,7 +1,14 @@
 import 'package:flutter/material.dart';
+import 'package:flutter/services.dart';
 import 'package:go_router/go_router.dart';
 
 import '../theme.dart';
+import 'court_chrome.dart';
+import 'court_icons.dart';
+
+// The nav pill, the stage panel and the header row live in court_chrome.dart.
+// Re-exported so the screens keep one import for "the shell".
+export 'court_chrome.dart';
 
 /// Widest a column of content gets. Past this the screen centres it.
 const courtContentWidth = 720.0;
@@ -57,25 +64,6 @@ class CourtBackground extends StatelessWidget {
       ),
     );
   }
-}
-
-/// Where a top-level screen sits in the main navigation.
-enum CourtTab {
-  home('/', Icons.home_outlined, Icons.home_rounded, 'Home'),
-  courts('/courts', Icons.groups_outlined, Icons.groups_rounded, 'Courts'),
-  record('/rap-sheet', Icons.fingerprint, Icons.fingerprint, 'Rap sheet'),
-  settings(
-    '/settings',
-    Icons.settings_outlined,
-    Icons.settings_rounded,
-    'Settings',
-  );
-
-  const CourtTab(this.path, this.icon, this.activeIcon, this.label);
-  final String path;
-  final IconData icon;
-  final IconData activeIcon;
-  final String label;
 }
 
 /// A round icon button with a small label under it, as in the reference.
@@ -200,103 +188,133 @@ class _DashedRRect extends CustomPainter {
   bool shouldRepaint(_DashedRRect old) => old.color != color;
 }
 
-/// The floating bottom bar: round buttons, the current one filled black.
-class _FloatingNav extends StatelessWidget {
-  const _FloatingNav({required this.current});
+/// The navigation shell: the page, the nav, and whichever tab is showing.
+///
+/// Built once by the router, not by each screen. A screen that drew its own
+/// nav bar tore it down and rebuilt it on every tab change — the pill blinked,
+/// and each tab lost its scroll position and its own back stack. With
+/// [StatefulNavigationShell] the four branches stay alive side by side and
+/// only the visible one changes.
+class CourtShell extends StatelessWidget {
+  const CourtShell({super.key, required this.navigationShell});
 
-  final CourtTab current;
+  final StatefulNavigationShell navigationShell;
 
   @override
-  Widget build(BuildContext context) => Container(
-    padding: const EdgeInsets.all(6),
-    decoration: BoxDecoration(
-      color: context.colors.surfaceContainerHighest,
-      borderRadius: BorderRadius.circular(40),
-      boxShadow: courtShadow(context),
-    ),
-    child: Row(
-      mainAxisSize: MainAxisSize.min,
-      children: [
-        for (final tab in CourtTab.values)
-          Semantics(
-            button: true,
-            selected: tab == current,
-            label: tab.label,
-            child: Tooltip(
-              message: tab.label,
-              child: InkWell(
-                customBorder: const CircleBorder(),
-                onTap: () => tab == current ? null : context.go(tab.path),
-                child: Container(
-                  width: 52,
-                  height: 52,
-                  margin: const EdgeInsets.symmetric(horizontal: 3),
-                  decoration: BoxDecoration(
-                    shape: BoxShape.circle,
-                    color: tab == current
-                        ? context.colors.onSurface
-                        : Colors.transparent,
-                  ),
-                  child: Icon(
-                    tab == current ? tab.activeIcon : tab.icon,
-                    color: tab == current
-                        ? context.colors.surface
-                        : context.colors.onSurface,
-                  ),
+  Widget build(BuildContext context) {
+    final width = MediaQuery.sizeOf(context).width;
+    final rail = width >= courtRailBreakpoint;
+    // A bottom bar is pushed up by the keyboard, so the pill would float on
+    // top of it — covering the row of keys and pointing at tabs the user is
+    // not trying to reach. While something is being typed, it stands down.
+    final typing = MediaQuery.viewInsetsOf(context).bottom > 0;
+    final current = CourtTab.values[navigationShell.currentIndex];
+
+    void go(int index) => navigationShell.goBranch(
+      index,
+      // Tapping the tab you are already on pops it back to its own root.
+      initialLocation: index == navigationShell.currentIndex,
+    );
+
+    return PopScope(
+      // Android back inside a tab: pop that tab's own stack first, then fall
+      // back to Home, and only leave the app from Home itself. Without this,
+      // back from any tab closed the app outright.
+      canPop: false,
+      onPopInvokedWithResult: (didPop, _) {
+        if (didPop) return;
+        final router = GoRouter.of(context);
+        if (router.canPop()) {
+          router.pop();
+        } else if (navigationShell.currentIndex != 0) {
+          go(0);
+        } else {
+          SystemNavigator.pop();
+        }
+      },
+      child: CourtBackground(
+        child: Scaffold(
+          backgroundColor: Colors.transparent,
+          // A real bottom bar, not an overlay. Flutter reserves the space, so
+          // nothing — scrolling or not — can end up underneath it.
+          bottomNavigationBar: rail || typing
+              ? null
+              : SafeArea(
+                  top: false,
+                  minimum: const EdgeInsets.only(bottom: 18),
+                  child: CourtNavBar(current: current, onSelect: go),
                 ),
-              ),
-            ),
-          ),
-      ],
-    ),
-  );
+          body: rail
+              ? Row(
+                  children: [
+                    _Rail(current: current, onSelect: go),
+                    Expanded(child: navigationShell),
+                  ],
+                )
+              : navigationShell,
+        ),
+      ),
+    );
+  }
 }
 
-/// A screen: soft grey canvas, a transparent app bar, content held to a
-/// readable width, and (for top-level screens) the main navigation: a floating
-/// bar on phones, a rail on tablets and in landscape.
+/// A screen: the warm page, the screen's own header, content held to a
+/// readable width.
+///
+/// The canvas has no app bar anywhere, so a screen that passes [header] gets
+/// its own row instead. [title] is still required: it is what the back button
+/// and the route announce, and screens outside the canvas (settings, invites,
+/// a court's page) fall back to a plain transparent bar.
+///
+/// Navigation is **not** drawn here — [CourtShell] owns it.
 class CourtScaffold extends StatelessWidget {
   const CourtScaffold({
     super.key,
     required this.title,
     required this.body,
+    this.header,
     this.actions,
     this.leading,
+    this.bottom,
     this.floatingActionButton,
     this.automaticallyImplyLeading = true,
-    this.tab,
     this.hero = false,
     this.maxWidth = courtContentWidth,
   });
 
   final String title;
   final Widget body;
+
+  /// The screen's own header row, drawn in place of an app bar.
+  final Widget? header;
+
   final List<Widget>? actions;
   final Widget? leading;
+
+  /// A docked panel pinned under the body.
+  final Widget? bottom;
+
   final Widget? floatingActionButton;
   final bool automaticallyImplyLeading;
-  final CourtTab? tab;
   final bool hero;
   final double maxWidth;
 
   @override
   Widget build(BuildContext context) {
-    final width = MediaQuery.sizeOf(context).width;
-    final rail = tab != null && width >= courtRailBreakpoint;
-    final bar = tab != null && !rail;
-    // Leave room under scrolling content for the floating bar.
-    final content = MediaQuery(
-      data: MediaQuery.of(context).copyWith(
-        padding: MediaQuery.paddingOf(context).copyWith(
-          bottom: MediaQuery.paddingOf(context).bottom + (bar ? 84 : 0),
-        ),
-      ),
-      child: Align(
-        alignment: Alignment.topCenter,
-        child: ConstrainedBox(
-          constraints: BoxConstraints(maxWidth: maxWidth),
-          child: body,
-        ),
+    final column = Column(
+      crossAxisAlignment: CrossAxisAlignment.stretch,
+      children: [
+        if (header != null) header!,
+        Expanded(child: body),
+        if (bottom != null) bottom!,
+      ],
+    );
+
+    final content = Align(
+      alignment: Alignment.topCenter,
+      child: ConstrainedBox(
+        constraints: BoxConstraints(maxWidth: maxWidth),
+        child: column,
       ),
     );
 
@@ -304,100 +322,130 @@ class CourtScaffold extends StatelessWidget {
       hero: hero,
       child: Scaffold(
         backgroundColor: Colors.transparent,
-        appBar: AppBar(
-          title: Text(title),
-          actions: actions,
-          leading: leading,
-          automaticallyImplyLeading: automaticallyImplyLeading && tab == null,
-        ),
-        floatingActionButton: floatingActionButton == null
+        appBar: header != null
             ? null
-            : Padding(
-                padding: EdgeInsets.only(bottom: bar ? 76 : 0),
-                child: floatingActionButton,
+            : AppBar(
+                title: Text(title),
+                actions: actions,
+                leading: leading,
+                automaticallyImplyLeading: automaticallyImplyLeading,
               ),
-        bottomNavigationBar: null,
-        body: Stack(
-          children: [
-            SafeArea(
-              child: rail
-                  ? Row(
-                      children: [
-                        _Rail(current: tab!),
-                        Expanded(child: content),
-                      ],
-                    )
-                  : content,
-            ),
-            if (bar)
-              Positioned(
-                left: 0,
-                right: 0,
-                bottom: 0,
-                child: SafeArea(
-                  minimum: const EdgeInsets.only(bottom: 12),
-                  child: Center(child: _FloatingNav(current: tab!)),
-                ),
-              ),
-          ],
-        ),
+        floatingActionButton: floatingActionButton,
+        body: SafeArea(bottom: bottom == null, child: content),
       ),
     );
   }
 }
 
+/// The same five slots as the pill, stood on end for a wide window.
 class _Rail extends StatelessWidget {
-  const _Rail({required this.current});
+  const _Rail({required this.current, required this.onSelect});
 
   final CourtTab current;
+  final ValueChanged<int> onSelect;
 
   @override
   Widget build(BuildContext context) => Padding(
-    padding: const EdgeInsets.fromLTRB(12, 8, 4, 12),
-    child: Container(
-      width: 76,
-      padding: const EdgeInsets.symmetric(vertical: 12),
-      decoration: BoxDecoration(
-        color: context.colors.surfaceContainerHighest,
-        borderRadius: BorderRadius.circular(40),
-        boxShadow: courtShadow(context),
-      ),
-      child: Column(
-        mainAxisSize: MainAxisSize.min,
-        children: [
-          for (final tab in CourtTab.values)
-            Padding(
-              padding: const EdgeInsets.symmetric(vertical: 4),
-              child: Semantics(
-                button: true,
-                selected: tab == current,
-                label: tab.label,
-                child: Tooltip(
-                  message: tab.label,
-                  child: InkWell(
-                    customBorder: const CircleBorder(),
-                    onTap: () => tab == current ? null : context.go(tab.path),
-                    child: Container(
-                      width: 52,
-                      height: 52,
-                      decoration: BoxDecoration(
-                        shape: BoxShape.circle,
-                        color: tab == current
-                            ? context.colors.onSurface
-                            : Colors.transparent,
-                      ),
-                      child: Icon(
-                        tab == current ? tab.activeIcon : tab.icon,
-                        color: tab == current
-                            ? context.colors.surface
-                            : context.colors.onSurface,
+    padding: const EdgeInsets.fromLTRB(12, 12, 4, 12),
+    child: Material(
+      type: MaterialType.transparency,
+      child: Container(
+        width: 84,
+        padding: const EdgeInsets.symmetric(vertical: 10),
+        decoration: BoxDecoration(
+          color: context.palette.nav,
+          borderRadius: BorderRadius.circular(courtRadiusPill),
+          border: Border.all(
+            color: context.palette.border,
+            width: courtBorderWidth,
+          ),
+          boxShadow: courtHardShadow(context),
+        ),
+        // Scrollable: in a short landscape window five slots are taller than
+        // the rail, and a nav bar is never a reason to drop a frame.
+        child: SingleChildScrollView(
+          child: Column(
+            mainAxisSize: MainAxisSize.min,
+            children: [
+              for (final tab in CourtTab.values) ...[
+                Padding(
+                  padding: const EdgeInsets.symmetric(vertical: 2),
+                  child: Semantics(
+                    button: true,
+                    selected: tab == current,
+                    label: tab.label,
+                    child: Tooltip(
+                      message: tab.label,
+                      child: InkWell(
+                        customBorder: const CircleBorder(),
+                        onTap: () => onSelect(tab.index),
+                        child: Container(
+                          width: 48,
+                          height: 48,
+                          alignment: Alignment.center,
+                          decoration: BoxDecoration(
+                            shape: BoxShape.circle,
+                            color: tab == current
+                                ? CourtColors.yellow
+                                : Colors.transparent,
+                          ),
+                          child: CourtIcon(
+                            tab.glyph,
+                            size: 24,
+                            color: tab == current
+                                ? CourtColors.lightInk
+                                : CourtColors.stageDim,
+                          ),
+                        ),
                       ),
                     ),
                   ),
                 ),
-              ),
-            ),
-        ],
+                // The filing key sits between Courts and the rap sheet here too,
+                // so the order matches the pill exactly.
+                if (tab == CourtTab.courts)
+                  Padding(
+                    padding: const EdgeInsets.symmetric(vertical: 4),
+                    child: Semantics(
+                      button: true,
+                      label: 'File a case',
+                      child: Tooltip(
+                        message: 'File a case',
+                        child: InkWell(
+                          customBorder: const CircleBorder(),
+                          onTap: () => context.push('/cases/new'),
+                          child: Container(
+                            width: 56,
+                            height: 56,
+                            alignment: Alignment.center,
+                            decoration: BoxDecoration(
+                              shape: BoxShape.circle,
+                              color: CourtColors.violet,
+                              border: Border.all(
+                                color: context.palette.border,
+                                width: courtBorderWidth,
+                              ),
+                              boxShadow: const [
+                                BoxShadow(
+                                  color: CourtColors.violetInk,
+                                  offset: Offset(0, 4),
+                                ),
+                              ],
+                            ),
+                            child: const CourtIcon(
+                              CourtGlyph.gavel,
+                              size: 26,
+                              color: Colors.white,
+                            ),
+                          ),
+                        ),
+                      ),
+                    ),
+                  ),
+              ],
+            ],
+          ),
+        ),
       ),
     ),
   );

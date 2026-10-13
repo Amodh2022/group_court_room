@@ -76,7 +76,7 @@ def test_full_flow_create_invite_defend_generate_reveal(client, defended_case, d
         "guilty", "not_guilty", "both_guilty", "insufficient_evidence"
     }
     assert body["model_version"] == "mock-judge-1"
-    assert body["prompt_version"] == "v2"
+    assert body["prompt_version"] == "v3"
 
     # The dashboard reflects it without a second request shape.
     summary = client.get("/api/v1/cases", headers=headers).json()[0]

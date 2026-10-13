@@ -8,6 +8,7 @@ import 'package:group_chat_court/features/cases/presentation/case_detail_screen.
 import 'support/fakes.dart';
 
 void main() {
+  _seatingTests();
   late FakeApiClient api;
 
   setUp(() => api = FakeApiClient());
@@ -87,7 +88,9 @@ void main() {
     await pump(tester);
     await tester.pumpAndSettle();
 
-    await tester.tap(find.byIcon(Icons.delete_outline));
+    // The chrome draws its own glyphs rather than Material icons, so the
+    // button is addressed the way a screen reader addresses it.
+    await tester.tap(find.bySemanticsLabel('Delete case'));
     await tester.pumpAndSettle();
 
     expect(find.text('Dismiss this case?'), findsOneWidget);
@@ -112,5 +115,52 @@ void main() {
 
     expect(find.text('Case not found.'), findsOneWidget);
     expect(find.text('Try again'), findsOneWidget);
+  });
+}
+
+void _seatingTests() {
+  late FakeApiClient api;
+
+  setUp(() => api = FakeApiClient());
+
+  testWidgets('seating a friend on a live case notifies them', (tester) async {
+    // The endpoint and the client method both existed; no screen called them,
+    // so the only way to involve a friend was to pick one while filing.
+    api.detail = buildDetail();
+    api.people = const [
+      UserRef(userId: 'user-9', displayName: 'Priya', handle: 'priya'),
+    ];
+    useMobileSurface(tester);
+    await tester.pumpWidget(
+      harness(
+        child: const CaseDetailScreen(caseId: 'case-1'),
+        overrides: [apiClientProvider.overrideWithValue(api)],
+      ),
+    );
+    await tester.pumpAndSettle();
+
+    await tester.dragUntilVisible(
+      find.text('Add a juror'),
+      find.byType(ListView).first,
+      const Offset(0, -300),
+    );
+    await tester.pumpAndSettle();
+    await tester.tap(find.text('Add a juror'));
+    await tester.pumpAndSettle();
+
+    await tester.enterText(
+      find.byWidgetPredicate(
+        (w) =>
+            w is TextField && w.decoration?.hintText == 'Handle or exact email',
+      ),
+      'priya',
+    );
+    await tester.pump(const Duration(milliseconds: 400));
+    await tester.pumpAndSettle();
+    await tester.tap(find.text('@priya'));
+    await tester.pumpAndSettle();
+
+    expect(api.seated, [('case-1', 'user-9', 'juror')]);
+    expect(find.textContaining('has been notified'), findsOneWidget);
   });
 }

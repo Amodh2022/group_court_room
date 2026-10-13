@@ -137,7 +137,7 @@ def test_a_good_answer_becomes_a_verdict():
     generation = llm.generate_verdict(REQUEST)
     assert generation.output.verdict == "guilty"
     assert generation.model_version == get_settings().gemini_model
-    assert generation.prompt_version == "v2"
+    assert generation.prompt_version == "v3"
 
 
 def test_thought_parts_are_ignored():

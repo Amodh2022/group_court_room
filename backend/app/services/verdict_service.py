@@ -24,7 +24,7 @@ from app.llm.base import (
 )
 from app.models import Case, CaseStatus, Offender, ParticipantRole, Verdict
 from app.prompts.verdict_prompt import PROMPT_VERSION
-from app.services import chat_service, jury_service, offender_service, safety
+from app.services import chat_service, jury_service, offender_service, safety, social_service
 from app.services.case_service import participant
 
 logger = logging.getLogger(__name__)
@@ -179,6 +179,14 @@ class VerdictService:
             update(Case)
             .where(Case.id == case.id)
             .values(status=CaseStatus.completed, failure_reason=None, updated_at=utcnow())
+        )
+        # Nobody is excluded: the judge caused this, not a player, so everyone
+        # following the case wants to hear it.
+        social_service.notify_case(
+            db,
+            case,
+            "verdict_ready",
+            f"Judge Byte has ruled on “{case.title}”.",
         )
         db.commit()
         db.refresh(verdict)

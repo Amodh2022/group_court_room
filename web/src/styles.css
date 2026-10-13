@@ -1,10 +1,15 @@
-/* Group Chat Court — design system.
+/* Sue Me — design system.
  *
- * Themed after the "Finance App Design" reference: a soft light-grey canvas,
- * white rounded cards with barely-there shadows, black pill and circle buttons,
- * round icon actions with small labels beneath, a pastel pink/violet/blue
- * gradient hero, dashed "add" tiles and a floating black bottom nav on phones.
+ * A playful game, not a dashboard: a warm cream canvas, white cards with a 3px
+ * ink border and a hard offset shadow (solid, zero blur), fat radii, and
+ * saturated buttons that press into the page. Primary actions are violet — the
+ * previous black-button "Finance App Design" theme is exactly what made this
+ * read as a banking app.
  * Verdict colours keep their meaning: guilty red, not guilty green, both orange.
+ *
+ * Depth here is a border plus an offset, never a blur. The one place the dark
+ * mode differs structurally: a black shadow is invisible on a dark surface, so
+ * there the rim carries the shape.
  *
  * Everything is a token; nothing below the :root blocks hardcodes a colour.
  */
@@ -12,51 +17,69 @@
 :root {
   color-scheme: light;
 
-  /* Surfaces */
-  --bg: #f4f4f5;
+  /* Surfaces: warm paper, not grey dashboard */
+  --bg: #fff7ec;
   --surface: #ffffff;
-  --tray: #f1f1f3;
-  --tray-2: #e7e7ea;
+  --tray: #ffeeda;
+  --tray-2: #ffe0bd;
 
   /* Text */
-  --ink: #0e0e10;
-  --ink-dim: #5f636b;
-  --ink-faint: #9a9ea6;
+  --ink: #171023;
+  --ink-dim: #5a4a68;
+  --ink-faint: #7a6b88;
+  --on-ink: #fff7ec;
 
-  /* Lines */
-  --line: #ececee;
-  --line-strong: #dcdcdc;
+  /* Lines. The structural line IS the ink: 3px, same colour as the text.
+     --line-soft is for hairlines *inside* a card, where ink would shout. */
+  --line: #171023;
+  --line-strong: #171023;
+  --line-soft: #e9ddcb;
 
-  /* Primary action: black, like the reference's buttons and bottom nav */
-  --primary: #0e0e10;
-  --primary-hover: #2a2a30;
+  /* Primary action: brand violet, never black */
+  --primary: #7a3bf0;
+  --primary-hover: #6a2ce0;
+  --primary-ink: #4a17b0;
   --on-primary: #ffffff;
-  --grad-hero: linear-gradient(160deg, #8fb4ff 0%, #c58bf2 28%, #f58ad6 52%, #ffc3ea 74%, #ffffff 100%);
-  --grad-card: linear-gradient(120deg, #ffd1ea 0%, #d8c8ff 55%, #cfe0ff 100%);
+  --grad-hero: linear-gradient(160deg, #ffd98a 0%, #ff9ec4 38%, #c4b0ff 72%, #8ad7ff 100%);
+  --grad-card: linear-gradient(120deg, #ffd98a 0%, #ff9ec4 55%, #c4b0ff 100%);
 
-  /* Semantic colour (sampled) */
-  --blue: #1773e4;
-  --blue-deep: #125fbf;
+  /* Semantic colour */
+  --blue: #2e6bff;
+  --blue-deep: #1b4acb;
   --on-blue: #ffffff;
-  --green: #7ae86f;
-  --green-ink: #1c9d46;
-  --on-green: #0c3a14;
-  --red: #d9524c;
+  --green: #35d07f;
+  --green-deep: #0e8a52;
+  --green-ink: #0e8a52;
+  --on-green: #0b3b22;
+  --red: #ff3b52;
+  --red-deep: #c70f31;
   --on-red: #ffffff;
-  --orange: #ff7441;
-  --on-orange: #3b1404;
-  --yellow: #ffc929;
+  --orange: #ff8a3d;
+  --orange-deep: #c2521a;
+  --on-orange: #3a1500;
+  --yellow: #ffc93c;
+  --yellow-deep: #a87400;
+  --pink: #ff5ca8;
 
-  --blue-soft: color-mix(in srgb, var(--blue) 11%, transparent);
-  --green-soft: color-mix(in srgb, var(--green) 26%, transparent);
-  --red-soft: color-mix(in srgb, var(--red) 11%, transparent);
-  --orange-soft: color-mix(in srgb, var(--orange) 14%, transparent);
+  --blue-soft: color-mix(in srgb, var(--blue) 14%, white);
+  --green-soft: color-mix(in srgb, var(--green) 22%, white);
+  --red-soft: color-mix(in srgb, var(--red) 16%, white);
+  --orange-soft: color-mix(in srgb, var(--orange) 20%, white);
+
+  /* Identity tints for avatars. Deliberately share no hue with a verdict:
+     an avatar tinted verdict-green reads as a ruling, not as a person. */
+  --tint-1: #ffc93c;
+  --tint-2: #ff9ec4;
+  --tint-3: #8ad7ff;
+  --tint-4: #c4b0ff;
+  --tint-5: #ffb27a;
+  --on-tint: #171023;
 
   /* Window chrome dots */
-  --dot-red: #e94a6a;
-  --dot-amber: #ec9c3d;
-  --dot-green: #63c554;
-  --presence: #89fb7d;
+  --dot-red: #ff3b52;
+  --dot-amber: #ff8a3d;
+  --dot-green: #35d07f;
+  --presence: #35d07f;
 
   /* Verdicts */
   --guilty: var(--red);
@@ -65,32 +88,69 @@
   --insufficient: #8a8f98;
 
   /* Type */
-  --font: "Inter", "Open Sans", -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, Helvetica,
-    Arial, sans-serif;
+  /* Nunito for body (rounded terminals, legible at 14–16px), Fredoka for
+     display only — it has no italic, stops at 700, and is too soft for prose. */
+  --font: "Nunito", -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, Helvetica, Arial,
+    sans-serif;
+  --font-display: "Fredoka", "Nunito", system-ui, sans-serif;
 
-  /* Geometry */
-  --r-sm: 12px;
-  --r: 18px;
-  --r-lg: 24px;
-  --r-xl: 32px;
+  /* Geometry: fat */
+  --r-sm: 14px;
+  --r: 20px;
+  --r-lg: 28px;
+  --r-xl: 36px;
   --r-pill: 999px;
-  --squircle: 36%;
+  --squircle: 30%;
+  --bw-thin: 2px;
+  --bw: 3px;
+  --bw-thick: 4px;
 
-  /* Depth: broad, soft, barely there */
-  --shadow: 0 1px 2px rgba(16, 24, 40, 0.03), 0 8px 28px rgba(16, 24, 40, 0.05);
-  --shadow-lg: 0 2px 6px rgba(16, 24, 40, 0.05), 0 30px 80px rgba(16, 24, 40, 0.13);
-  --shadow-pill: 0 4px 14px rgba(16, 24, 40, 0.08);
-  --glow-blue: 0 10px 26px color-mix(in srgb, var(--blue) 32%, transparent);
-  --glow-green: 0 10px 26px color-mix(in srgb, var(--green) 40%, transparent);
-  --glow-red: 0 10px 26px color-mix(in srgb, var(--red) 32%, transparent);
-  --glow-orange: 0 10px 26px color-mix(in srgb, var(--orange) 36%, transparent);
+  /* Depth: a solid offset with ZERO blur. This, plus the border, is the look.
+     The tonal variants put a darker shade of the fill under a coloured
+     button so it reads as a physical key. */
+  --sd: 4px;
+  --sd-lg: 8px;
+  --shadow: 0 var(--sd) 0 0 var(--ink);
+  --shadow-lg: 0 var(--sd-lg) 0 0 var(--ink);
+  --shadow-pill: 0 var(--sd) 0 0 var(--ink);
+  --shadow-primary: 0 var(--sd) 0 0 var(--primary-ink);
+  --shadow-red: 0 var(--sd) 0 0 var(--red-deep);
+  --shadow-green: 0 var(--sd) 0 0 var(--green-deep);
+  --shadow-orange: 0 var(--sd) 0 0 var(--orange-deep);
+  /* Aliases: every existing `box-shadow: var(--glow-*)` rule below becomes a
+     hard shadow without being edited. Lets the swap land in one step. */
+  --glow-blue: var(--shadow);
+  --glow-green: var(--shadow-green);
+  --glow-red: var(--shadow-red);
+  --glow-orange: var(--shadow-orange);
 
   /* Motion */
-  --fast: 140ms;
-  --base: 260ms;
-  --slow: 600ms;
-  --ease: cubic-bezier(0.22, 0.61, 0.36, 1);
-  --ease-out-back: cubic-bezier(0.18, 0.89, 0.32, 1.28);
+  --fast: 120ms;
+  --base: 220ms;
+  --pop: 420ms;
+  --slow: 520ms;
+  --ease: cubic-bezier(0.2, 0.8, 0.2, 1);
+  --ease-out-back: cubic-bezier(0.34, 1.56, 0.64, 1);
+}
+
+/* The chunky recipe, defined once. A raised surface is a fill, a 3px ink
+   border and a hard offset shadow; a pressable one translates down into its
+   own shadow so the press feels physical. */
+.chunk {
+  border: var(--bw) solid var(--ink);
+  border-radius: var(--r);
+  box-shadow: var(--shadow);
+}
+
+.chunk-press {
+  transition:
+    transform var(--fast) var(--ease),
+    box-shadow var(--fast) var(--ease);
+}
+
+.chunk-press:active {
+  transform: translateY(var(--sd));
+  box-shadow: 0 0 0 0 var(--ink);
 }
 
 @media (prefers-color-scheme: dark) {
@@ -151,6 +211,8 @@ body {
 h1,
 h2,
 h3 {
+  font-family: var(--font-display);
+  font-weight: 700;
   letter-spacing: -0.015em;
 }
 
@@ -586,7 +648,7 @@ a {
 .card {
   position: relative;
   background: var(--surface);
-  border: 1px solid transparent;
+  border: var(--bw) solid var(--ink);
   border-radius: var(--r-lg);
   padding: 26px 22px;
   box-shadow: var(--shadow);
@@ -692,9 +754,10 @@ h2.case-title {
   padding: 5px 12px;
   border-radius: var(--r-pill);
   background: var(--tray);
-  color: var(--ink-dim);
+  border: var(--bw-thin) solid var(--ink);
+  color: var(--ink);
   font-size: 12.5px;
-  font-weight: 600;
+  font-weight: 700;
   white-space: nowrap;
 }
 
@@ -735,7 +798,7 @@ h2.case-title {
   border-radius: 8px;
   font-size: 11.5px;
   font-weight: 700;
-  color: #fff;
+  color: var(--on-blue);
   background: var(--blue);
 }
 
@@ -744,7 +807,7 @@ h2.case-title {
 }
 
 .tag-green {
-  background: #2bc88a;
+  background: var(--green-deep);
 }
 
 @keyframes pulse {
@@ -767,10 +830,11 @@ h2.case-title {
   inline-size: 40px;
   block-size: 40px;
   border-radius: var(--squircle);
-  color: var(--ink);
+  color: var(--on-tint);
   font-weight: 700;
   font-size: 15px;
-  background: var(--yellow);
+  background: var(--tint-1);
+  border: var(--bw-thin) solid var(--ink);
 }
 
 .avatar.lg {
@@ -780,19 +844,19 @@ h2.case-title {
 }
 
 .avatar.c1 {
-  background: #ff9d8f;
+  background: var(--tint-2);
 }
 
 .avatar.c2 {
-  background: var(--green);
+  background: var(--tint-1);
 }
 
 .avatar.c3 {
-  background: #8ec5ff;
+  background: var(--tint-3);
 }
 
 .avatar.c4 {
-  background: #c4b0ff;
+  background: var(--tint-4);
 }
 
 .avatar.judge {
@@ -876,7 +940,7 @@ h2.case-title {
   padding: 18px 20px;
   border-radius: var(--r-lg);
   background: var(--surface);
-  border: 1px solid var(--line);
+  border: var(--bw) solid var(--ink);
   box-shadow: var(--shadow);
   color: inherit;
   text-decoration: none;
@@ -926,6 +990,7 @@ h2.case-title {
 /* --- verdict stamp --------------------------------------------------------- */
 
 .stamp-wrap {
+  position: relative; /* anchors the dust kicked up when the stamp lands */
   text-align: center;
   padding: 26px 0 12px;
 }
@@ -1107,12 +1172,13 @@ h2.case-title {
   gap: 4px;
   padding: 20px 18px;
   border-radius: var(--r-lg);
-  border: 2px solid transparent;
-  background: var(--tray);
+  border: var(--bw) solid var(--ink);
+  background: var(--surface);
+  box-shadow: var(--shadow);
   color: var(--ink);
   font: inherit;
   font-weight: 700;
-  font-size: 17px;
+  font-size: 19px;
   cursor: pointer;
   min-block-size: 48px;
   text-align: center;
@@ -1424,12 +1490,13 @@ textarea {
   width: 100%;
   margin-top: 22px;
   padding: 15px 24px;
-  border: 0;
-  border-radius: var(--r-pill);
+  border: var(--bw) solid var(--ink);
+  border-radius: var(--r);
   background: var(--primary);
   color: var(--on-primary);
+  box-shadow: var(--shadow-primary);
   font: inherit;
-  font-weight: 600;
+  font-weight: 700;
   font-size: 16px;
   cursor: pointer;
   min-height: 48px; /* comfortable touch target */
@@ -1806,11 +1873,11 @@ textarea {
   font-weight: 700;
   letter-spacing: 0.06em;
   text-transform: uppercase;
-  color: #fff;
+  color: var(--on-primary);
 }
 
 .chat-ruling.sustained {
-  background: #2bc88a;
+  background: var(--green-deep);
 }
 
 .chat-ruling.overruled {
@@ -2009,7 +2076,8 @@ textarea {
   text-align: start;
   background: var(--grad-hero);
   background-size: 100% 100%;
-  box-shadow: var(--shadow);
+  border: var(--bw-thick) solid var(--ink);
+  box-shadow: var(--shadow-lg);
 }
 
 .hero-panel .hero-top {
@@ -2022,11 +2090,11 @@ textarea {
   margin: 0;
   inline-size: 56px;
   block-size: 56px;
-  background: rgba(255, 255, 255, 0.55);
-  color: #0e0e10;
-  box-shadow: none;
+  background: var(--surface);
+  color: var(--ink);
+  border: var(--bw) solid var(--ink);
+  box-shadow: var(--shadow);
   border-radius: var(--r-pill);
-  backdrop-filter: blur(8px);
 }
 
 .hero-panel .gavel svg {
@@ -2036,9 +2104,10 @@ textarea {
 
 .hero-panel h1 {
   margin: 0;
-  color: #0e0e10;
-  font-size: clamp(40px, 10vw, 68px);
-  font-weight: 500;
+  color: var(--ink);
+  font-family: var(--font-display);
+  font-size: clamp(40px, 11vw, 68px);
+  font-weight: 700;
   line-height: 1.02;
   letter-spacing: -0.045em;
 }
@@ -2046,7 +2115,7 @@ textarea {
 .hero-panel .lede {
   margin: 16px 0 0;
   max-width: 44ch;
-  color: #2c2c32;
+  color: var(--ink-dim);
 }
 
 .hero-panel .hero-actions {
@@ -2064,11 +2133,12 @@ textarea {
   max-inline-size: 22rem;
   padding: 6px 6px 6px 22px;
   border-radius: var(--r-pill);
-  background: rgba(255, 255, 255, 0.78);
-  color: #0e0e10;
-  font-weight: 600;
+  background: var(--primary);
+  color: var(--on-primary);
+  font-weight: 700;
   text-decoration: none;
-  backdrop-filter: blur(10px);
+  border: var(--bw) solid var(--ink);
+  box-shadow: var(--shadow);
 }
 
 .cta-circle {
@@ -2077,8 +2147,9 @@ textarea {
   inline-size: 48px;
   block-size: 48px;
   border-radius: var(--r-pill);
-  background: #0e0e10;
-  color: #fff;
+  background: var(--surface);
+  color: var(--ink);
+  border: var(--bw-thin) solid var(--ink);
 }
 
 .cta-circle svg {
@@ -2103,22 +2174,24 @@ textarea {
 
 .balance-top .card-label {
   margin: 0;
-  color: color-mix(in srgb, #0e0e10 62%, transparent);
+  color: var(--ink-dim);
 }
 
 .balance-figure {
   margin: 0;
-  color: #0e0e10;
+  color: var(--ink);
+  font-family: var(--font-display);
   font-size: clamp(44px, 12vw, 64px);
-  font-weight: 600;
+  font-weight: 700;
   line-height: 1.05;
+  font-variant-numeric: tabular-nums;
   letter-spacing: -0.045em;
 }
 
 .balance-delta {
   display: grid;
   gap: 2px;
-  color: #0e0e10;
+  color: var(--ink);
   font-size: 13px;
   font-weight: 600;
   text-align: end;
@@ -2152,7 +2225,9 @@ textarea {
   inline-size: 56px;
   block-size: 56px;
   border-radius: var(--r-pill);
-  background: var(--tray);
+  background: var(--surface);
+  border: var(--bw) solid var(--ink);
+  box-shadow: var(--shadow);
   color: var(--ink);
   font-size: 26px;
   transition: transform var(--fast) var(--ease), background var(--fast) var(--ease);
@@ -2206,7 +2281,7 @@ textarea {
   gap: 8px;
   min-block-size: 96px;
   padding: 18px;
-  border: 2px dashed var(--line-strong);
+  border: var(--bw) dashed var(--ink);
   border-radius: var(--r-lg);
   background: transparent;
   color: var(--ink-dim);
@@ -2361,4 +2436,541 @@ video {
 .hero-panel .hero-actions {
   display: flex;
   justify-content: flex-start;
+}
+
+/* "How it works" step icons: a tinted chunky badge instead of an emoji. */
+.step-badge {
+  flex: none;
+  display: grid;
+  place-items: center;
+  inline-size: 44px;
+  block-size: 44px;
+  border-radius: var(--r-sm);
+  border: var(--bw-thin) solid var(--ink);
+  box-shadow: 0 var(--bw) 0 0 var(--ink);
+  color: var(--ink);
+}
+
+.step-badge svg {
+  inline-size: 22px;
+  block-size: 22px;
+}
+
+/* ───────────────────────────────────────────────────────────────────────────
+ * The stage.
+ *
+ * A case is one room, not a stack of pages. The stage is fixed to the
+ * viewport, never scrolls as a whole, and holds four parallax layers plus a
+ * content pane. Scenes change the camera — a scale, a lift, a tilt and a
+ * "heat" that warms the backdrop — and swap the pane. Nothing else re-mounts.
+ *
+ * Two custom properties drive everything and are written from JS:
+ *   --gaze-x / --gaze-y   pointer or device tilt, -1..1
+ *   --cam-*               the current shot (see lib/stage.ts)
+ * Both have static fallbacks here, so the stage is correct with JS disabled
+ * and correct before the first pointermove.
+ * ─────────────────────────────────────────────────────────────────────────── */
+
+.stage {
+  --gaze-x: 0;
+  --gaze-y: 0;
+  --cam-z: 1;
+  --cam-y: 0px;
+  --cam-tilt: 0deg;
+  --cam-heat: 0.35;
+  --cam-sway: 14px;
+  --cam-ms: 700ms;
+  --ease-cam: cubic-bezier(0.22, 1, 0.36, 1);
+  /* Overshoots past 1 on the way: the camera arrives, then settles. */
+  --ease-fly: cubic-bezier(0.34, 1.42, 0.5, 1);
+
+  position: fixed;
+  inset: 0;
+  overflow: hidden;
+  background: var(--bg);
+  /* Makes .stage a stacking context of its own, so the negative z-index on the
+     camera below is contained here instead of escaping to the root. */
+  isolation: isolate;
+  /* NOT `perspective` here. That makes a 3D rendering context of .stage, and
+     every child joins it — including .stage-content, which then sorts by its
+     Z against the camera instead of by z-index. A pushed-in shot (z > 1) wins
+     that sort and the backdrop paints over the page. The perspective belongs
+     inside the camera's own transform, where only the camera sees it. */
+  /* The room is the surface; a stray two-finger swipe must not rubber-band it. */
+  overscroll-behavior: none;
+}
+
+/* Two nested elements, because the camera is doing two independent jobs.
+   The outer one holds the *shot* — where the scene says to stand — and the
+   inner one never stops breathing. Composing both onto one transform would
+   mean the breath restarting every time the shot changed. */
+.stage-camera {
+  position: absolute;
+  /* Negative, not 0. The spec paints negative-z descendants after the parent's
+     own background but before every other descendant, which is exactly the
+     guarantee the backdrop needs — and unlike z-index: 0 it does not depend on
+     whether the compositor happened to promote one sibling and not the other.
+     .stage keeps its background: that paints lower still. */
+  z-index: -1;
+  inset: -8%; /* bleed, so a pushed-in camera never exposes an edge */
+  /* Flat, deliberately. The layers only ever translate in 2D and the camera's
+     tilt is a single small rotateX, so a real 3D context buys nothing — and it
+     costs correctness: preserve-3d lifts descendants out of this element's
+     stacking context to sort by depth, which let the bench paint straight
+     through the cards. */
+  transform-style: flat;
+  transform: perspective(1200px) translate3d(0, var(--cam-y), 0) rotateX(var(--cam-tilt))
+    scale(var(--cam-z));
+  /* A flight, not a fade: the overshoot in this curve is the camera arriving
+     slightly past its mark and settling back, which is what reads as weight. */
+  transition: transform var(--cam-ms) var(--ease-fly);
+  /* No `will-change: transform` here. It promotes the camera to its own
+     compositing layer, and the backdrop then rasterises over .stage-content
+     despite a lower z-index — dust specks land on top of the cards and the
+     bench shows through them. The transition is cheap enough without it. */
+}
+
+.stage-breath {
+  position: absolute;
+  inset: 0;
+  animation: stage-breathe 19s ease-in-out infinite;
+}
+
+/* Deliberately not a loop of the same move: three different periods, so the
+   room never visibly repeats. Amplitudes are tiny — this should read as the
+   room being alive, never as the page drifting. */
+@keyframes stage-breathe {
+  0% {
+    transform: translate3d(0, 0, 0) scale(1);
+  }
+  27% {
+    transform: translate3d(-6px, -9px, 0) scale(1.012);
+  }
+  51% {
+    transform: translate3d(5px, 4px, 0) scale(1.004);
+  }
+  78% {
+    transform: translate3d(8px, -5px, 0) scale(1.016);
+  }
+  100% {
+    transform: translate3d(0, 0, 0) scale(1);
+  }
+}
+
+.stage-layer {
+  --depth: 0;
+  position: absolute;
+  inset: 0;
+  transform: translate3d(
+    calc(var(--gaze-x) * var(--cam-sway) * var(--depth) * -1),
+    calc(var(--gaze-y) * var(--cam-sway) * var(--depth) * -1),
+    0
+  );
+  /* Short, so the gaze feels attached to the hand; the camera is the slow one. */
+  transition: transform 260ms cubic-bezier(0.33, 1, 0.68, 1);
+}
+
+/* The backdrop. Heat slides it from courthouse-cold to judgment-hot without
+   ever leaving the brand ramp — these are the same stops as --grad-hero. */
+.stage-sky {
+  background:
+    radial-gradient(
+      120% 90% at 50% calc(100% - var(--cam-heat) * 30%),
+      color-mix(in srgb, var(--orange) calc(var(--cam-heat) * 55%), var(--tray-2)) 0%,
+      transparent 62%
+    ),
+    linear-gradient(
+      165deg,
+      color-mix(in srgb, var(--yellow) calc(var(--cam-heat) * 40%), #ffd98a) 0%,
+      #ff9ec4 36%,
+      #c4b0ff 70%,
+      color-mix(in srgb, var(--blue) calc(var(--cam-heat) * 30%), #8ad7ff) 100%
+    );
+  transition: background var(--cam-ms) var(--ease-cam);
+}
+
+.stage-dust {
+  width: 100%;
+  height: 100%;
+  display: block;
+}
+
+/* The bench. The one persistent object in the room — it is the thing the
+   camera pushes toward on "rise", so it must never re-mount. */
+.stage-bench {
+  display: grid;
+  place-items: end center;
+}
+
+.bench-arch {
+  position: absolute;
+  bottom: 4%;
+  left: 50%;
+  width: min(64vw, 520px);
+  aspect-ratio: 1 / 1;
+  translate: -50% 0;
+  border: var(--bw) solid var(--line);
+  border-radius: var(--r-pill) var(--r-pill) var(--r-lg) var(--r-lg);
+  background: color-mix(in srgb, var(--surface) 70%, transparent);
+  opacity: 0.55;
+}
+
+.bench-top {
+  position: absolute;
+  bottom: 0;
+  left: 50%;
+  width: min(84vw, 680px);
+  height: 16%;
+  translate: -50% 0;
+  border: var(--bw) solid var(--line);
+  border-bottom: 0;
+  border-radius: var(--r-lg) var(--r-lg) 0 0;
+  background: var(--tray);
+  box-shadow: 0 calc(var(--sd-lg) * -1) 0 0 color-mix(in srgb, var(--ink) 12%, transparent);
+}
+
+/* The glow off the bench. It pulses on its own and brightens with the heat,
+   so the room has a heartbeat even in a scene where nothing is happening. */
+.bench-glow {
+  position: absolute;
+  bottom: -6%;
+  left: 50%;
+  width: min(96vw, 760px);
+  height: 46%;
+  translate: -50% 0;
+  border-radius: 50%;
+  pointer-events: none;
+  background: radial-gradient(
+    closest-side,
+    color-mix(in srgb, var(--orange) calc(30% + var(--cam-heat) * 50%), transparent) 0%,
+    transparent 100%
+  );
+  filter: blur(14px);
+  animation: bench-pulse 5.5s ease-in-out infinite;
+}
+
+@keyframes bench-pulse {
+  0%,
+  100% {
+    opacity: calc(0.35 + var(--cam-heat) * 0.3);
+    transform: scale(1);
+  }
+  50% {
+    opacity: calc(0.6 + var(--cam-heat) * 0.4);
+    transform: scale(1.06);
+  }
+}
+
+.bench-seal {
+  position: absolute;
+  bottom: 5%;
+  left: 50%;
+  translate: -50% 0;
+  font-family: var(--font-display);
+  font-size: clamp(32px, 7vw, 64px);
+  color: var(--ink);
+  opacity: 0.18;
+}
+
+/* Foreground haze. Rides *with* the gaze (negative depth) and darkens as the
+   room heats up, which is what keeps the pushed-in shots from going flat. */
+.stage-haze {
+  pointer-events: none;
+  background: radial-gradient(
+    140% 100% at 50% 50%,
+    transparent 38%,
+    color-mix(in srgb, var(--ink) calc(18% + var(--cam-heat) * 22%), transparent) 100%
+  );
+  transition: background var(--cam-ms) var(--ease-cam);
+}
+
+/* The pane. The only scrollable thing on the stage, and the only thing that
+   swaps between scenes. */
+.stage-content {
+  position: absolute;
+  /* Explicit, not implied by document order — and `will-change` is load-bearing
+     here, not a hint. The backdrop runs an infinite animation, so the compositor
+     promotes it to its own layer; an unpromoted sibling then rasterises
+     underneath it whatever its z-index says, and the dust ends up on top of the
+     cards. Promoting this one too puts both in the same comparison. */
+  z-index: 2;
+  will-change: transform;
+  inset: 0;
+  display: flex;
+  padding: calc(60px + env(safe-area-inset-top)) 16px calc(24px + env(safe-area-inset-bottom));
+  overflow-y: auto;
+  overscroll-behavior: contain;
+  -webkit-overflow-scrolling: touch;
+  animation: scene-in 520ms var(--ease-cam) both;
+}
+
+.stage-rail {
+  margin: auto;
+  display: grid;
+  justify-items: center;
+  gap: 16px;
+  width: 100%;
+  max-width: 560px;
+}
+
+.stage-rail > * {
+  width: 100%;
+}
+
+@keyframes scene-in {
+  from {
+    opacity: 0;
+    transform: translate3d(0, 18px, 0) scale(0.985);
+  }
+  to {
+    opacity: 1;
+    transform: none;
+  }
+}
+
+/* The HUD sits outside the camera: it is the one thing that must not move
+   when the room does, because it is how you leave. */
+.stage-hud {
+  position: absolute;
+  top: max(12px, env(safe-area-inset-top));
+  left: 0;
+  right: 0;
+  z-index: 3;
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 10px;
+  padding: 0 14px;
+  pointer-events: none;
+}
+
+.stage-hud > * {
+  pointer-events: auto;
+}
+
+/* A juror who has not voted must not see the room heat up on "rise" — that is
+   a tell. Scenes they cannot reach simply never render, so this is belt and
+   braces for the case where the camera is driven from a stale status. */
+.stage[data-scene="rise"] .stage-content {
+  animation-duration: 300ms;
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .stage-camera,
+  .stage-layer,
+  .stage-sky,
+  .stage-haze {
+    transition: none;
+  }
+  .stage-breath,
+  .bench-glow,
+  .reveal-gavel {
+    animation: none;
+  }
+  .stage-content {
+    animation: none;
+  }
+}
+
+/* Scene furniture. Panels on the stage are lighter than a `.card` — the room
+   has to read through them, or the parallax behind is wasted. */
+.scene-title {
+  text-align: center;
+}
+
+.scene-line {
+  margin: 6px 0 0;
+  font-family: var(--font-display);
+  font-size: clamp(26px, 6.4vw, 46px);
+  font-weight: 700;
+  line-height: 1.08;
+  color: var(--ink);
+  text-wrap: balance;
+}
+
+.scene-panel {
+  border: var(--bw) solid var(--line);
+  border-radius: var(--r-lg);
+  background: color-mix(in srgb, var(--surface) 88%, transparent);
+  backdrop-filter: blur(10px);
+  box-shadow: var(--shadow);
+  padding: 18px;
+}
+
+.scene-panel[data-tone="plaintiff"] {
+  border-color: var(--red-deep);
+  box-shadow: var(--shadow-red);
+}
+
+.scene-panel[data-tone="defense"] {
+  border-color: var(--blue-deep);
+  box-shadow: 0 var(--sd) 0 0 var(--blue-deep);
+}
+
+.scene-panel[data-tone="bench"] {
+  border-color: var(--primary-ink);
+  box-shadow: var(--shadow-primary);
+}
+
+.scene-next {
+  justify-self: center;
+  min-width: min(100%, 280px);
+}
+
+.scene-progress {
+  display: flex;
+  gap: 8px;
+  justify-content: center;
+  margin: 0;
+  padding: 0;
+  list-style: none;
+  width: auto !important;
+}
+
+.scene-progress li {
+  width: 26px;
+  height: 6px;
+  border-radius: var(--r-pill);
+  border: var(--bw-thin) solid var(--line);
+  background: transparent;
+  transition: background 320ms ease;
+}
+
+.scene-progress li[data-state="done"] {
+  background: var(--ink);
+}
+
+.scene-progress li[data-state="now"] {
+  background: var(--primary);
+}
+
+/* The chat has to live inside a fixed pane now, so it gets a height rather
+   than growing the page. */
+.stage-rail .courtroom {
+  display: flex;
+  flex-direction: column;
+  /* Both bounds matter: without the floor the log collapses to a strip when
+     the socket has nothing to show yet. */
+  min-height: 260px;
+  max-height: min(58vh, 520px);
+}
+
+.stage-rail .courtroom-body {
+  min-height: 0;
+  flex: 1;
+}
+
+.scene-progress-wrap {
+  display: grid;
+  justify-items: center;
+  gap: 6px;
+  width: auto !important;
+}
+
+.scene-progress-label {
+  margin: 0;
+  font-size: 12px;
+  font-weight: 700;
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
+  color: var(--ink-dim);
+}
+
+/* ── Impact ────────────────────────────────────────────────────────────────
+ * Two moments in the game are strikes rather than transitions. They are the
+ * only places anything in the room moves abruptly, which is exactly why they
+ * land: everything else drifts.
+ * ────────────────────────────────────────────────────────────────────────── */
+
+/* The gavel is swinging on a 1.1s loop in `@keyframes gavel`, striking at
+   roughly 40% of it. This shares that period so the room takes the hit on the
+   same beat — change one duration and you must change the other. */
+.stage[data-scene="rise"] {
+  animation: room-shake 1.1s var(--ease) infinite;
+}
+
+@keyframes room-shake {
+  0%,
+  36%,
+  54%,
+  100% {
+    transform: translate3d(0, 0, 0);
+  }
+  39% {
+    transform: translate3d(-8px, 5px, 0);
+  }
+  43% {
+    transform: translate3d(7px, -4px, 0);
+  }
+  47% {
+    transform: translate3d(-4px, 2px, 0);
+  }
+  51% {
+    transform: translate3d(2px, -1px, 0);
+  }
+}
+
+/* The stamp coming down. The existing `stamp-in` scales it into place; this
+   adds the recoil underneath — the card flinches, then settles. */
+.stamp-animate {
+  animation:
+    stamp-in var(--slow) var(--ease-out-back) both,
+    stamp-recoil 620ms var(--ease) both;
+}
+
+@keyframes stamp-recoil {
+  0%,
+  44% {
+    filter: none;
+  }
+  52% {
+    filter: drop-shadow(0 0 18px color-mix(in srgb, var(--orange) 70%, transparent));
+  }
+  100% {
+    filter: none;
+  }
+}
+
+/* Dust kicked up by the stamp. One element, one pass, no loop: it happens
+   once and is gone, like real dust. */
+.stamp-wrap::after {
+  content: "";
+  position: absolute;
+  inset: auto 0 -10px;
+  height: 40px;
+  pointer-events: none;
+  background: radial-gradient(
+    closest-side,
+    color-mix(in srgb, var(--orange) 45%, transparent),
+    transparent
+  );
+  opacity: 0;
+}
+
+.stamp-wrap:has(.stamp-animate)::after {
+  animation: dust-kick 900ms var(--ease) 380ms both;
+}
+
+@keyframes dust-kick {
+  0% {
+    opacity: 0;
+    transform: scaleX(0.4) translateY(0);
+  }
+  30% {
+    opacity: 0.8;
+  }
+  100% {
+    opacity: 0;
+    transform: scaleX(1.5) translateY(-26px);
+  }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .stage[data-scene="rise"],
+  .stamp-wrap:has(.stamp-animate)::after {
+    animation: none;
+  }
+  .stamp-animate {
+    animation: stamp-in var(--slow) var(--ease-out-back) both;
+  }
 }

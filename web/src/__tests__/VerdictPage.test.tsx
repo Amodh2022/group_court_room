@@ -20,7 +20,7 @@ const VERDICT = {
   jury: null,
   jury_overruled: false,
   decided_at: "2026-10-09T12:00:00Z",
-  disclaimer: "Group Chat Court is a comedy game. Not legal advice.",
+  disclaimer: "Sue Me is a comedy game. Not legal advice.",
 };
 
 function renderPage(token = "shr_token") {
@@ -83,6 +83,10 @@ describe("public verdict page", () => {
   it("offers a clear call to action to start a new case", async () => {
     mockFetchOnce(200, VERDICT);
     renderPage();
+    // After the reveal, not during it: the share row and the call to action
+    // belong to the verdict, and there is no verdict on screen until the
+    // beats have played out.
+    await skipReveal();
     expect(
       await screen.findByRole("link", { name: /take your own case to court/i }),
     ).toHaveAttribute("href", "/file");

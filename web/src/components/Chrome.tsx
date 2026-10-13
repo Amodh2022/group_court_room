@@ -21,7 +21,7 @@ export function AppBar() {
         <span className="seal" aria-hidden="true">
           <Courthouse />
         </span>
-        <span>Group Chat Court</span>
+        <span>Sue Me</span>
       </Link>
 
       {signedIn ? (
@@ -154,7 +154,7 @@ export function Disclaimer({ children }: { children?: ReactNode }) {
   return (
     <p className="disclaimer">
       {children ??
-        "Group Chat Court is a comedy game. Verdicts are entertainment — not a finding of fact, and not legal advice."}
+        "Sue Me is a comedy game. Verdicts are entertainment — not a finding of fact, and not legal advice."}
     </p>
   );
 }

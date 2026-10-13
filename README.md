@@ -1,4 +1,4 @@
-# Group Chat Court
+# Sue Me
 
 An AI-powered party game for a whole group chat. File a case about a harmless
 friend-group disagreement, summon the accused to defend themselves, seat

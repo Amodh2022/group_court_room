@@ -1,28 +1,32 @@
 import { Link } from "react-router-dom";
 
-import { Gavel, IconArrow } from "../components/Icons";
+import { Gavel, IconArrow, IconGavel, IconLink, IconList, IconUsers } from "../components/Icons";
 
 import { Chip, Disclaimer, Shell } from "../components/Chrome";
 import { session } from "../lib/session";
 
 const STEPS = [
   {
-    emoji: "📝",
+    Icon: IconList,
+    tint: "var(--tint-1)",
     title: "File the case",
     text: "Describe the disagreement. The pettier, the better.",
   },
   {
-    emoji: "📨",
+    Icon: IconLink,
+    tint: "var(--tint-2)",
     title: "Summon the accused",
     text: "Add them by handle, or send one link. They answer for themselves.",
   },
   {
-    emoji: "👥",
+    Icon: IconUsers,
+    tint: "var(--tint-3)",
     title: "Seat the jury",
     text: "Pick a court and its members are the jury, or share a link. Everyone votes before anyone sees the ruling.",
   },
   {
-    emoji: "⚖️",
+    Icon: IconGavel,
+    tint: "var(--tint-4)",
     title: "Hear the verdict",
     text: "Judge Byte rules, reads out the priors, and sometimes overrules the lot of you.",
   },
@@ -64,8 +68,8 @@ export default function HomePage() {
         <ol style={{ listStyle: "none", padding: 0, margin: 0 }}>
           {STEPS.map((step, index) => (
             <li key={step.title} className="section" style={{ display: "flex", gap: 14 }}>
-              <span aria-hidden="true" style={{ fontSize: 26, lineHeight: 1.2 }}>
-                {step.emoji}
+              <span aria-hidden="true" className="step-badge" style={{ background: step.tint }}>
+                <step.Icon />
               </span>
               <div>
                 <h3>

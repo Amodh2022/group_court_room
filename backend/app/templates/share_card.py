@@ -41,7 +41,7 @@ def _wrap(text: str, width: int, max_lines: int) -> list[str]:
 def render_share_card(result: dict) -> str:
     verdict = str(result.get("verdict", "insufficient_evidence"))
     label, colour = _STAMP.get(verdict, _STAMP["insufficient_evidence"])
-    title = escape(str(result.get("case_title", "Group Chat Court")))
+    title = escape(str(result.get("case_title", "Sue Me")))
     caption_lines = [escape(line) for line in
                      _wrap(str(result.get("share_caption", "")), 46, 2)]
     sentence_lines = [escape(line) for line in
@@ -97,7 +97,7 @@ def render_og_page(*, result: dict, canonical_url: str, card_url: str) -> str:
     The SPA cannot provide these: crawlers do not execute JavaScript, so the
     preview would be blank. A human hitting this URL is redirected into the app.
     """
-    title = escape(f"{result.get('case_title', 'Verdict')} — Group Chat Court")
+    title = escape(f"{result.get('case_title', 'Verdict')} — Sue Me")
     description = escape(str(result.get("share_caption", "The court has ruled.")))[:200]
     canonical = escape(canonical_url, quote=True)
     card = escape(card_url, quote=True)

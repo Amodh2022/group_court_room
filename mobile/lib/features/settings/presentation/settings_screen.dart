@@ -5,6 +5,7 @@ import 'package:go_router/go_router.dart';
 import '../../../core/appearance.dart';
 import '../../../core/env.dart';
 import '../../../core/theme.dart';
+import '../../../core/widgets/court_icons.dart';
 import '../../../core/widgets/court_layout.dart';
 import '../../../core/widgets/court_widgets.dart';
 import '../../auth/data/auth_providers.dart';
@@ -18,9 +19,14 @@ class SettingsScreen extends ConsumerWidget {
 
     return CourtScaffold(
       title: 'Settings',
-      tab: CourtTab.settings,
+      header: ScreenHeader(
+        title: 'Settings',
+        eyebrow: session?.displayName.toUpperCase(),
+        titleSize: 32,
+        padding: const EdgeInsets.fromLTRB(20, 20, 20, 12),
+      ),
       body: ListView(
-        padding: const EdgeInsets.fromLTRB(16, 12, 16, 40),
+        padding: const EdgeInsets.fromLTRB(16, 0, 16, courtNavBottomInset),
         children: [
           CourtCard(
             child: Column(
@@ -33,13 +39,17 @@ class SettingsScreen extends ConsumerWidget {
                   style: context.text.titleLarge,
                 ),
                 const SizedBox(height: 16),
-                OutlinedButton.icon(
+                CourtKey(
+                  label: 'Sign out',
+                  glyph: CourtGlyph.close,
+                  height: 52,
+                  fill: context.colors.surfaceContainerHighest,
+                  foreground: context.colors.onSurface,
+                  shadowInk: context.palette.shadowInk,
                   onPressed: () async {
                     await ref.read(authControllerProvider.notifier).signOut();
                     if (context.mounted) context.go('/sign-in');
                   },
-                  icon: const Icon(Icons.logout),
-                  label: const Text('Sign out'),
                 ),
               ],
             ),
@@ -199,6 +209,23 @@ class _AppearanceSection extends ConsumerWidget {
             child: SegmentedButton<ThemeMode>(
               key: const Key('appearance'),
               showSelectedIcon: false,
+              // Material's default selected fill is the scheme's secondary,
+              // which here is the verdict green — a colour that means "not
+              // guilty" everywhere else in the app. Use the yellow the nav
+              // pill uses for "this is the one you are on".
+              style: SegmentedButton.styleFrom(
+                selectedBackgroundColor: CourtColors.yellow,
+                selectedForegroundColor: CourtColors.lightInk,
+                foregroundColor: context.colors.onSurface,
+                side: BorderSide(
+                  color: context.palette.border,
+                  width: courtBorderThin,
+                ),
+                textStyle: const TextStyle(
+                  fontWeight: FontWeight.w800,
+                  fontSize: 14,
+                ),
+              ),
               segments: const [
                 ButtonSegment(value: ThemeMode.light, label: Text('Light')),
                 ButtonSegment(value: ThemeMode.dark, label: Text('Dark')),

@@ -5,6 +5,7 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 import '../../../core/api_client.dart';
 import '../../../core/models.dart';
 import '../../auth/data/auth_providers.dart';
+import '../../courts/data/court_providers.dart';
 
 /// Dashboard list. Rebuilds when the signed-in user changes.
 final casesProvider = FutureProvider.autoDispose<List<CaseSummary>>((
@@ -137,6 +138,14 @@ class CaseActions {
     return created;
   }
 
+  /// Seat a friend on a live case. The server notifies them — that is the
+  /// whole point of seating somebody by account rather than by nickname.
+  Future<void> addMember(String caseId, String userId, String role) async {
+    await _api.addCaseMember(caseId, userId, role);
+    _ref.invalidate(caseDetailProvider(caseId));
+    _ref.invalidate(casesProvider);
+  }
+
   Future<void> delete(String id) async {
     await _api.deleteCase(id);
     _ref.invalidate(casesProvider);
@@ -157,3 +166,36 @@ class CaseActions {
 }
 
 final caseActionsProvider = Provider<CaseActions>(CaseActions.new);
+
+/// The summons behind a `SharedCase` whose `linkKind` is `jury`.
+///
+/// Keyed by the jury token, which is the only capability the endpoint wants.
+/// The voter key is the signed-in user id, so the same account answering from
+/// phone and browser is still one juror.
+final juryRoomProvider = FutureProvider.autoDispose.family<JuryRoom, String>((
+  ref,
+  token,
+) async {
+  final me = ref.watch(authControllerProvider).valueOrNull;
+  return ref
+      .watch(apiClientProvider)
+      .juryRoom(token, voterKey: me?.userId ?? '');
+});
+
+/// Casts this account's ballot on a case it was summoned to.
+final juryVoteProvider = Provider<Future<void> Function(String, String)>((ref) {
+  return (String token, String vote) async {
+    final me = ref.read(authControllerProvider).valueOrNull;
+    if (me == null) return;
+    await ref
+        .read(apiClientProvider)
+        .castVote(
+          token,
+          vote: vote,
+          voterKey: me.userId,
+          jurorName: me.displayName,
+        );
+    ref.invalidate(juryRoomProvider(token));
+    ref.invalidate(sharedCasesProvider);
+  };
+});

@@ -10,6 +10,7 @@ import 'package:group_chat_court/core/courtroom.dart';
 import 'package:group_chat_court/core/models.dart';
 import 'package:group_chat_court/core/router.dart';
 import 'package:group_chat_court/core/theme.dart';
+import 'package:group_chat_court/core/widgets/court_chrome.dart';
 import 'package:group_chat_court/features/auth/data/auth_providers.dart';
 import 'package:shared_preferences/shared_preferences.dart';
 
@@ -17,6 +18,16 @@ import 'support/fakes.dart';
 
 const _alex = UserRef(userId: 'user-1', handle: 'alex', displayName: 'Alex');
 const _sam = UserRef(userId: 'user-2', handle: 'sam', displayName: 'Sam');
+// A court with one member never stacks its faces, and the stack is where the
+// layout actually bites: overlapping avatars drawn with a negative margin
+// throw on layout, which a single-member fixture can never catch.
+const _crowd = [
+  _alex,
+  UserRef(userId: 'user-3', handle: 'priya', displayName: 'Priya'),
+  UserRef(userId: 'user-4', handle: 'dev', displayName: 'Dev'),
+  UserRef(userId: 'user-5', handle: 'arjun', displayName: 'Arjun'),
+  UserRef(userId: 'user-6', handle: 'maya', displayName: 'Maya'),
+];
 
 final searchField = find.byWidgetPredicate(
   (w) => w is TextField && w.decoration?.hintText == 'Handle or exact email',
@@ -40,7 +51,7 @@ void main() {
               name: 'The Brunch Crew With A Very Long Name Indeed',
               inviteCode: 'ABCD1234',
               ownerId: 'user-1',
-              members: [_alex],
+              members: _crowd,
             ),
           ]
           ..shared = [
@@ -141,6 +152,19 @@ void main() {
       expect(tester.getCenter(find.byTooltip('Courts')).dy, greaterThan(600));
     });
 
+    testWidgets('content stops above the bar, never under it', (tester) async {
+      await pumpApp(tester, const Size(360, 800));
+      // The bar is a real bottomNavigationBar, so Scaffold lays the body out
+      // above it. This pins that. It used to be a Stack overlay with a faked
+      // MediaQuery inset, which only covered widgets that read the inset —
+      // non-scrolling content and the FAB were clipped behind the pill.
+      expect(
+        tester.getRect(find.byType(RefreshIndicator)).bottom,
+        lessThanOrEqualTo(tester.getRect(find.byTooltip('Courts')).top),
+        reason: 'the docket must end above the nav pill',
+      );
+    });
+
     testWidgets('tablet gets a rail down the left edge', (tester) async {
       await pumpApp(tester, const Size(1000, 800));
       expect(
@@ -164,7 +188,52 @@ void main() {
       await pumpApp(tester, const Size(360, 800));
       await tester.tap(find.byTooltip('Courts'));
       await tester.pumpAndSettle();
-      expect(find.text('Your friend groups'), findsOneWidget);
+      expect(find.text('Courts'), findsOneWidget);
+    });
+
+    testWidgets('the pill is built once, not once per screen', (tester) async {
+      await pumpApp(tester, const Size(360, 800));
+      expect(find.byType(CourtNavBar), findsOneWidget);
+
+      // The same element, not an equal one: the shell keeps the bar mounted
+      // across a tab change. When every screen drew its own, this came back
+      // as a different element each time and the pill visibly blinked.
+      final before = tester.element(find.byType(CourtNavBar));
+      await tester.tap(find.byTooltip('Rap sheet'));
+      await tester.pumpAndSettle();
+      await tester.tap(find.byTooltip('Courts'));
+      await tester.pumpAndSettle();
+
+      expect(find.byType(CourtNavBar), findsOneWidget);
+      expect(identical(tester.element(find.byType(CourtNavBar)), before), isTrue);
+    });
+
+    testWidgets('each tab keeps its own place', (tester) async {
+      final router = await pumpApp(tester, const Size(360, 800));
+      router.go('/courts/court-1');
+      await tester.pumpAndSettle();
+      expect(find.text('INVITE CODE'), findsOneWidget);
+
+      await tester.tap(find.byTooltip('Home'));
+      await tester.pumpAndSettle();
+      expect(find.text('INVITE CODE'), findsNothing);
+
+      // Back to Courts: still inside the court we opened, not reset to the
+      // list. That is the whole point of a branch per tab.
+      await tester.tap(find.byTooltip('Courts'));
+      await tester.pumpAndSettle();
+      expect(find.text('INVITE CODE'), findsOneWidget);
+      expect(router.state.matchedLocation, '/courts/court-1');
+    });
+
+    testWidgets('a takeover screen covers the pill', (tester) async {
+      final router = await pumpApp(tester, const Size(360, 800));
+      expect(find.byType(CourtNavBar), findsOneWidget);
+
+      // Filing, a case file and a ruling are full-screen on the canvas.
+      router.push('/cases/new');
+      await tester.pumpAndSettle();
+      expect(find.byType(CourtNavBar), findsNothing);
     });
   });
 
@@ -193,7 +262,14 @@ void main() {
       await tester.tap(find.text('@sam'));
       await tester.pumpAndSettle();
 
-      expect(api.courts.first.members.map((m) => m.handle), ['alex', 'sam']);
+      expect(api.courts.first.members.map((m) => m.handle), [
+        'alex',
+        'priya',
+        'dev',
+        'arjun',
+        'maya',
+        'sam',
+      ]);
       expect(find.text('Sam'), findsOneWidget);
     });
 
@@ -204,16 +280,25 @@ void main() {
       router.go('/cases/new?court=court-1');
       await tester.pumpAndSettle();
 
+      // Addressed by what each box says: the canvas puts the accused above
+      // the charge, so a positional index would point at the wrong one.
+      Finder fieldWithHint(String hint) => find.ancestor(
+        of: find.byWidgetPredicate(
+          (w) => w is TextField && w.decoration?.hintText == hint,
+        ),
+        matching: find.byType(TextFormField),
+      );
+
       await tester.enterText(
-        find.byType(TextFormField).at(0),
+        fieldWithHint('The Last Pizza Slice'),
         'The Last Pizza Slice',
       );
       await tester.enterText(
-        find.byType(TextFormField).at(1),
+        fieldWithHint('State the crime. Be dramatic.'),
         'They ate the last slice right after saying they were full.',
       );
-      await tester.ensureVisible(find.text('Pick a friend by handle'));
-      await tester.tap(find.text('Pick a friend by handle'));
+      await tester.ensureVisible(find.text('Search'));
+      await tester.tap(find.text('Search'));
       await tester.pumpAndSettle();
       await tester.enterText(searchField, 'sa');
       await tester.pump(const Duration(milliseconds: 400));
@@ -221,8 +306,9 @@ void main() {
       await tester.tap(find.text('@sam'));
       await tester.pumpAndSettle();
 
-      await tester.ensureVisible(find.text('File the case'));
-      await tester.tap(find.text('File the case'));
+      // Once the court can name the accused, the key names them too.
+      await tester.ensureVisible(find.text('Sue Sam'));
+      await tester.tap(find.text('Sue Sam'));
       await tester.pumpAndSettle();
 
       expect(api.lastCreate?['court_id'], 'court-1');
@@ -233,9 +319,9 @@ void main() {
   group('shared cases and notifications', () {
     testWidgets('dashboard lists cases shared with me', (tester) async {
       await pumpApp(tester, const Size(360, 800));
-      expect(find.text('Shared with me'), findsOneWidget);
-      expect(find.text('Who Left The Group'), findsOneWidget);
-      await tester.tap(find.text('Who Left The Group'));
+      expect(find.text('Needs you'), findsOneWidget);
+      expect(find.text('JURY DUTY'), findsOneWidget);
+      await tester.tap(find.text('Open the summons'));
       await tester.pumpAndSettle();
       expect(find.textContaining('/jury/tok123'), findsOneWidget);
     });
@@ -244,11 +330,9 @@ void main() {
       tester,
     ) async {
       await pumpApp(tester, const Size(360, 800));
-      expect(
-        tester.widget<Badge>(find.byType(Badge)).label,
-        isA<Text>().having((t) => t.data, 'data', '2'),
-      );
-      await tester.tap(find.byIcon(Icons.notifications_none_rounded).first);
+      // The bell draws its own badge rather than Material's.
+      expect(find.text('2'), findsWidgets);
+      await tester.tap(find.bySemanticsLabel('Notifications, 2 new').first);
       await tester.pumpAndSettle();
       expect(find.text('Sam added you to The Brunch Crew'), findsOneWidget);
       expect(api.readAllCalls, 1);

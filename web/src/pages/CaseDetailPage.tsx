@@ -43,7 +43,7 @@ function asPublicVerdict(response: VerdictResponse, detail: CaseDetail): PublicV
     ),
     decided_at: response.created_at ?? new Date().toISOString(),
     disclaimer:
-      "Group Chat Court is a comedy game. This verdict is entertainment, not a finding of fact.",
+      "Sue Me is a comedy game. This verdict is entertainment, not a finding of fact.",
   };
 }
 

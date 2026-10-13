@@ -4,6 +4,7 @@ import 'package:flutter/material.dart';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:group_chat_court/core/api_client.dart';
 import 'package:group_chat_court/core/models.dart';
+import 'package:group_chat_court/core/widgets/court_chrome.dart';
 import 'package:group_chat_court/core/widgets/court_widgets.dart';
 import 'package:group_chat_court/features/auth/data/auth_providers.dart';
 import 'package:group_chat_court/features/cases/presentation/dashboard_screen.dart';
@@ -46,7 +47,7 @@ void main() {
       await tester.pumpAndSettle();
 
       expect(find.text('The docket is empty'), findsOneWidget);
-      expect(find.widgetWithText(FilledButton, 'File a case'), findsOneWidget);
+      expect(find.widgetWithText(CourtKey, 'File a case'), findsOneWidget);
     });
 
     testWidgets('renders a card per case', (tester) async {
@@ -93,13 +94,11 @@ void main() {
     testWidgets('labels a case awaiting a defense', (tester) async {
       await pumpWithStatus(tester, CaseStatus.awaitingDefense);
       expect(find.text('Awaiting defense'), findsOneWidget);
-      expect(find.byIcon(Icons.hourglass_top), findsOneWidget);
     });
 
     testWidgets('labels a case ready for a verdict', (tester) async {
       await pumpWithStatus(tester, CaseStatus.ready);
       expect(find.text('Ready for verdict'), findsOneWidget);
-      expect(find.byIcon(Icons.gavel), findsWidgets);
     });
 
     testWidgets('labels a case in deliberation', (tester) async {
@@ -110,7 +109,6 @@ void main() {
     testWidgets('labels a completed case', (tester) async {
       await pumpWithStatus(tester, CaseStatus.completed);
       expect(find.text('Verdict in'), findsOneWidget);
-      expect(find.byIcon(Icons.verified), findsOneWidget);
     });
 
     testWidgets('labels a failed case as retryable', (tester) async {
@@ -129,12 +127,13 @@ void main() {
       ];
       await pump(tester);
       await tester.pumpAndSettle();
-      expect(find.byIcon(Icons.public), findsOneWidget);
+      // The card says it in words rather than with a globe glyph.
+      expect(find.text('Public'), findsOneWidget);
     });
 
     testWidgets('does not mark an unshared case as public', (tester) async {
       await pumpWithStatus(tester, CaseStatus.completed);
-      expect(find.byIcon(Icons.public), findsNothing);
+      expect(find.text('Public'), findsNothing);
     });
   });
 
@@ -162,14 +161,14 @@ void main() {
       }
     });
 
-    testWidgets('read like the reference: trial number and a pill', (
+    testWidgets('read like the canvas: who it is against, and a pill', (
       tester,
     ) async {
       api.cases = [buildSummary(id: 'abcde-1234')];
       await pump(tester);
       await tester.pumpAndSettle();
 
-      expect(find.textContaining('Court Trial · ABCDE'), findsOneWidget);
+      expect(find.text('v. SliceBandit'), findsOneWidget);
       expect(find.text('Open'), findsOneWidget);
     });
 

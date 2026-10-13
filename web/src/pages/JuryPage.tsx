@@ -2,10 +2,12 @@ import { useCallback, useEffect, useMemo, useState } from "react";
 import { Link, useParams } from "react-router-dom";
 
 import { Courtroom } from "../components/Courtroom";
-import { Parties } from "../components/Parties";
-import { Chip, Disclaimer, ErrorBanner, LoadingCard, Notice, Shell } from "../components/Chrome";
+import { Chip, Disclaimer, ErrorBanner, Notice } from "../components/Chrome";
+import { CourtStage } from "../components/stage/CourtStage";
+import { ScenePanel, SceneNext, SceneProgress, SceneTitle } from "../components/stage/SceneParts";
 import { TallyBar } from "../components/VerdictCard";
 import { VerdictReveal } from "../components/VerdictReveal";
+import type { Scene } from "../lib/stage";
 import {
   ApiError,
   api,
@@ -20,6 +22,10 @@ import { LIMITS } from "../lib/validation";
 /** While the court is out, check back without making the juror refresh. */
 const POLL_MS = 4000;
 
+/** The stages of a case, for the progress rail. The reveal is not on it: you
+ *  do not get to see how far away the verdict is. */
+const STAGES = ["Charge", "Defense", "Your vote", "The bench"] as const;
+
 export default function JuryPage() {
   const { token = "" } = useParams();
   const [room, setRoom] = useState<JuryRoom | null>(null);
@@ -28,6 +34,8 @@ export default function JuryPage() {
   const [name, setName] = useState(() => session.jurorName ?? "");
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState<string | null>(null);
+
+  const [revealed, setRevealed] = useState<"rise" | "verdict">("rise");
 
   // The name the room knows you by. It changes when you vote, which reconnects
   // the socket once; history replays, so nothing is lost.
@@ -104,184 +112,154 @@ export default function JuryPage() {
     }
   }
 
-  if (failure === "offline") {
-    return (
-      <Shell>
-        <Notice emoji="📡" title="The courthouse is not answering">
-          Your link looks fine — we just could not reach the court. Check your connection
-          and try again.
-        </Notice>
-        <button
-          className="btn"
-          type="button"
-          onClick={() => {
-            setFailure(null);
-            void load();
-          }}
-        >
-          Try again
-        </button>
-        <Disclaimer />
-      </Shell>
-    );
-  }
+  // --- where the camera is ---------------------------------------------------
+  //
+  // The camera follows the *case*, never a click. A juror is never made to
+  // page through the charge to reach the ballot: both sides, the chat and the
+  // ballot are one scene, and the room moves when the case does — the defense
+  // lands, the vote goes in, the judge rises. That is the difference between a
+  // room you are standing in and a slideshow.
+  const scene: Scene = !room
+    ? "arrival"
+    : verdict
+      ? revealed
+      : room.your_vote
+        ? "deliberation"
+        : room.defense
+          ? "ballot"
+          : "charge";
 
-  if (failure === "invalid") {
-    return (
-      <Shell>
-        <Notice emoji="🔒" title="This jury summons is not valid">
-          The link may have expired or been revoked. Ask whoever filed the case for a fresh one.
-        </Notice>
-        <Link className="btn btn-secondary" to="/">
-          What is Group Chat Court?
-        </Link>
-        <Disclaimer />
-      </Shell>
-    );
-  }
+  const stage = !room ? 0 : room.your_vote ? 3 : room.defense ? 2 : 1;
 
-  if (!room) {
-    return (
-      <Shell>
-        <LoadingCard label="Entering the jury box" />
-      </Shell>
-    );
-  }
+  const onStage = useCallback((next: "rise" | "verdict") => setRevealed(next), []);
 
-  // --- the reveal, for a juror who voted ---
-  if (verdict) {
-    return (
-      <Shell>
-        <VerdictReveal verdict={verdict} yourVote={room.your_vote} />
-        <Courtroom room={courtroom} title="Argue about it" />
-        <Link className="btn btn-secondary" to="/file">
-          File a case of your own
-        </Link>
-        <Disclaimer>{verdict.disclaimer}</Disclaimer>
-      </Shell>
-    );
-  }
-
-  // --- the jury has been dismissed, and this person never voted ---
-  if (!room.jury_open && !room.your_vote) {
-    return (
-      <Shell>
-        <Notice emoji="⚖️" title="This jury has been dismissed">
-          {room.verdict_ready
-            ? "The court has already ruled, and it does not seat jurors after the fact."
-            : "Voting on this case is closed."}
-        </Notice>
-        <Link className="btn btn-secondary" to="/file">
-          File a case of your own
-        </Link>
-        <Disclaimer />
-      </Shell>
-    );
-  }
-
-  const canVote = Boolean(room.defense);
+  const hud = (
+    <>
+      <Link className="chip" to="/">
+        Sue&nbsp;Me
+      </Link>
+      {room && !verdict && (
+        <Chip live={!room.your_vote}>
+          {room.your_vote ? "Your vote is in" : courtroom.state === "live" ? `${courtroom.online} here` : "Jury duty"}
+        </Chip>
+      )}
+    </>
+  );
 
   return (
-    <Shell>
-      <section className="card">
-        <p className="card-label">
-          {room.your_vote ? "You are seated" : "You have been called for jury duty"}
-        </p>
-        <h2 className="case-title">{room.case_title}</h2>
-        <div className="row" style={{ marginTop: 12 }}>
-          <Chip accent>
-            {room.plaintiff_name} v. {room.defendant_name}
-          </Chip>
+    <CourtStage scene={scene} hud={hud}>
+      {renderScene()}
+    </CourtStage>
+  );
+
+  function renderScene() {
+    if (failure === "offline") {
+      return (
+        <>
+          <Notice emoji="📡" title="The courthouse is not answering">
+            Your link looks fine — we just could not reach the court. Check your connection and
+            try again.
+          </Notice>
+          <SceneNext
+            onClick={() => {
+              setFailure(null);
+              void load();
+            }}
+          >
+            Try again
+          </SceneNext>
+          <Disclaimer />
+        </>
+      );
+    }
+
+    if (failure === "invalid") {
+      return (
+        <>
+          <Notice emoji="🔒" title="This jury summons is not valid">
+            The link may have expired or been revoked. Ask whoever filed the case for a fresh one.
+          </Notice>
+          <Link className="btn btn-secondary scene-next" to="/">
+            What is Sue Me?
+          </Link>
+          <Disclaimer />
+        </>
+      );
+    }
+
+    if (!room) {
+      return (
+        <SceneTitle label="Approaching the bench">Entering the courtroom…</SceneTitle>
+      );
+    }
+
+    // --- the reveal, for a juror who voted ---
+    if (verdict) {
+      return (
+        <>
+          <VerdictReveal verdict={verdict} yourVote={room.your_vote} onStage={onStage} />
+          {revealed === "verdict" && (
+            <>
+              <Courtroom room={courtroom} title="Argue about it" />
+              <Link className="btn btn-secondary scene-next" to="/file">
+                File a case of your own
+              </Link>
+              <Disclaimer>{verdict.disclaimer}</Disclaimer>
+            </>
+          )}
+        </>
+      );
+    }
+
+    // --- the jury has been dismissed, and this person never voted ---
+    if (!room.jury_open && !room.your_vote) {
+      return (
+        <>
+          <Notice emoji="⚖️" title="This jury has been dismissed">
+            {room.verdict_ready
+              ? "The court has already ruled, and it does not seat jurors after the fact."
+              : "Voting on this case is closed."}
+          </Notice>
+          <Link className="btn btn-secondary scene-next" to="/file">
+            File a case of your own
+          </Link>
+          <Disclaimer />
+        </>
+      );
+    }
+
+    const canVote = Boolean(room.defense);
+
+    // One scene, whatever the camera is doing. Everything a juror needs to
+    // judge the case is on screen at once: the charge, the answer, the room,
+    // and the ballot. The camera is the only thing that moves.
+    const voted = Boolean(room.your_vote);
+
+    return (
+      <>
+        <SceneProgress step={stage} of={STAGES.length} labels={STAGES} />
+
+        <SceneTitle label={`${room.plaintiff_name} v. ${room.defendant_name}`}>
+          {room.case_title}
+        </SceneTitle>
+
+        <div className="row" style={{ justifyContent: "center" }}>
           {!canVote && <Chip live>Awaiting the defense</Chip>}
-          {room.your_vote && (
-            <Chip verdict={room.your_vote}>
+          {voted && (
+            <Chip verdict={room.your_vote!}>
               You voted {room.your_vote === "guilty" ? "guilty" : "not guilty"}
             </Chip>
           )}
         </div>
-      </section>
 
-      <Parties
-        plaintiff={room.plaintiff_name}
-        defendant={room.defendant_name}
-        defended={canVote}
-      />
-
-      <Courtroom room={courtroom} />
-
-      {room.your_vote ? (
-        <section className="card">
-          <p className="card-label">Your vote is on the record</p>
-          <p className="meta" style={{ marginTop: 0 }}>
-            It cannot be changed, which is the point.{" "}
-            {room.verdict_ready
-              ? "The ruling is in. Fetching it…"
-              : "Judge Byte rules once the plaintiff calls the court to order. Keep this page open — the verdict appears right here."}
-          </p>
-          {room.tally && (
-            <div className="section">
-              <h3>The jury so far</h3>
-              <p className="meta" style={{ marginTop: 0 }}>
-                {room.tally.summary}
-              </p>
-              <TallyBar tally={room.tally} />
-            </div>
-          )}
-        </section>
-      ) : (
-        <section className="card">
-          <p className="card-label">Your verdict</p>
-          <p className="meta" style={{ marginTop: 0 }}>
-            One vote per person, and you cannot change it. You will not see how anyone else voted
-            until yours is in.
-          </p>
-
-          <label htmlFor="juror-name">Your name (optional)</label>
-          <input
-            id="juror-name"
-            value={name}
-            maxLength={LIMITS.nickname.max}
-            placeholder="Juror #7"
-            autoComplete="nickname"
-            onChange={(e) => setName(e.target.value)}
-          />
-
-          <div className="ballot">
-            <button
-              className="ballot-btn"
-              data-vote="guilty"
-              type="button"
-              disabled={busy || !canVote}
-              onClick={() => vote("guilty")}
-            >
-              Guilty
-              <small>They did it and they know it</small>
-            </button>
-            <button
-              className="ballot-btn"
-              data-vote="not_guilty"
-              type="button"
-              disabled={busy || !canVote}
-              onClick={() => vote("not_guilty")}
-            >
-              Not guilty
-              <small>This case should never have been filed</small>
-            </button>
-          </div>
-
-          {error && <ErrorBanner>{error}</ErrorBanner>}
-        </section>
-      )}
-
-      <details className="card card-flat">
-        <summary style={{ cursor: "pointer", fontWeight: 600 }}>Read the case file</summary>
-        <div className="section">
-          <h3>The prosecution says</h3>
+        <ScenePanel tone="plaintiff">
+          <p className="card-label">The prosecution says</p>
           <p className="quote">“{room.accusation}”</p>
-        </div>
-        <div className="section">
-          <h3>The defense says</h3>
-          {room.defense ? (
+        </ScenePanel>
+
+        <ScenePanel tone="defense">
+          <p className="card-label">The defense says</p>
+          {canVote ? (
             <p className="quote quote-defense">“{room.defense}”</p>
           ) : (
             <p className="meta" style={{ marginTop: 0 }}>
@@ -289,10 +267,77 @@ export default function JuryPage() {
               a juror who votes on half a case is just a hater.
             </p>
           )}
-        </div>
-      </details>
+        </ScenePanel>
 
-      <Disclaimer />
-    </Shell>
-  );
+        {/* The chat opens alongside the ballot, never instead of it. */}
+        <Courtroom room={courtroom} />
+
+        {voted ? (
+          <ScenePanel tone="bench">
+            <p className="card-label">Your vote is on the record</p>
+            <p className="meta" style={{ marginTop: 0 }}>
+              It cannot be changed, which is the point.{" "}
+              {room.verdict_ready
+                ? "The ruling is in. Fetching it…"
+                : "Judge Byte rules once the plaintiff calls the court to order. Keep this page open — the verdict appears right here."}
+            </p>
+            {room.tally && (
+              <div className="section">
+                <h3>The jury so far</h3>
+                <p className="meta" style={{ marginTop: 0 }}>
+                  {room.tally.summary}
+                </p>
+                <TallyBar tally={room.tally} />
+              </div>
+            )}
+          </ScenePanel>
+        ) : (
+          <ScenePanel tone="bench">
+            <p className="card-label">Your verdict</p>
+            <p className="meta" style={{ marginTop: 0 }}>
+              One vote per person, and you cannot change it. You will not see how anyone else
+              voted until yours is in.
+            </p>
+
+            <label htmlFor="juror-name">Your name (optional)</label>
+            <input
+              id="juror-name"
+              value={name}
+              maxLength={LIMITS.nickname.max}
+              placeholder="Juror #7"
+              autoComplete="nickname"
+              onChange={(e) => setName(e.target.value)}
+            />
+
+            <div className="ballot">
+              <button
+                className="ballot-btn"
+                data-vote="guilty"
+                type="button"
+                disabled={busy || !canVote}
+                onClick={() => vote("guilty")}
+              >
+                Guilty
+                <small>They did it and they know it</small>
+              </button>
+              <button
+                className="ballot-btn"
+                data-vote="not_guilty"
+                type="button"
+                disabled={busy || !canVote}
+                onClick={() => vote("not_guilty")}
+              >
+                Not guilty
+                <small>This case should never have been filed</small>
+              </button>
+            </div>
+
+            {error && <ErrorBanner>{error}</ErrorBanner>}
+          </ScenePanel>
+        )}
+
+        <Disclaimer />
+      </>
+    );
+  }
 }

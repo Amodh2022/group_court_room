@@ -59,6 +59,10 @@ def test_court_flow_and_privacy(client):
     assert joined.status_code == 200
     assert len(client.get("/api/v1/courts", headers=hc).json()) == 1
 
+    # New codes never contain look-alike characters (0/O, 1/I/L).
+    assert len(court["invite_code"]) == 8
+    assert set(court["invite_code"]).isdisjoint("01IL")
+
     # Non-owner cannot remove others; owner can; anyone can leave.
     other = client.delete(f"/api/v1/courts/{court['id']}/members/{b['user_id']}", headers=hc)
     assert other.status_code == 403
@@ -198,3 +202,60 @@ def test_deleting_a_case_removes_it_for_everyone_seated_on_it(client, auth_heade
 
     assert client.get("/api/v1/cases/shared", headers=friend).json() == []
     assert client.get("/api/v1/notifications", headers=friend).json()["items"] == []
+
+
+def _kinds(client, headers):
+    return [n["kind"] for n in client.get("/api/v1/notifications", headers=headers).json()["items"]]
+
+
+def test_the_beats_of_a_case_notify_everyone_following_it(client, defended_case, drain):
+    """Being summoned is not the only thing worth a notification.
+
+    The defense landing and the ruling are the two moments a player is actually
+    waiting on, and before this they produced nothing at all — not in the bell,
+    and so not as a push either.
+    """
+    ha, _ = _acct(client, "alex@example.com", "Alex")
+    hb, b = _acct(client, "jordan@example.com", "Jordan")
+    hc, c = _acct(client, "casey@example.com", "Casey")
+    court = client.post("/api/v1/courts", json={"name": "Crew"}, headers=ha).json()
+    for u in (b, c):
+        client.post(
+            f"/api/v1/courts/{court['id']}/members", json={"user_id": u["user_id"]}, headers=ha
+        )
+
+    case, _ = defended_case(
+        ha, defendant_nickname=None, court_id=court["id"], accused_user_id=b["user_id"]
+    )
+
+    # The plaintiff hears that the charge has been answered...
+    assert "defense_filed" in _kinds(client, ha)
+    # ...and so does the juror, who is waiting to vote on it.
+    assert "defense_filed" in _kinds(client, hc)
+
+    client.post(f"/api/v1/cases/{case['id']}/verdict", headers=ha)
+    assert drain() == 1
+
+    # The ruling reaches everyone following the case, including the accused.
+    for headers in (ha, hb, hc):
+        assert "verdict_ready" in _kinds(client, headers)
+
+
+def test_a_refused_second_defense_announces_nothing(client, defended_case):
+    """A refused second defense must not add another notification.
+
+    This exercises the status guard, which refuses before any row is written.
+    The other refusal path — losing the UNIQUE race on submissions — relies on
+    the notification sharing the transaction that gets rolled back, and is not
+    reachable from a single-threaded test.
+    """
+    ha, _ = _acct(client, "alex@example.com", "Alex")
+    case, _ = defended_case(ha)
+
+    before = _kinds(client, ha).count("defense_filed")
+    again = client.post(
+        f"/api/v1/invites/{case['invite_token']}/defense",
+        json={"nickname": "Sam", "body": "Let me try that again, with feeling."},
+    )
+    assert again.status_code == 409
+    assert _kinds(client, ha).count("defense_filed") == before

@@ -21,6 +21,21 @@ void main() {
     );
   }
 
+
+  /// The form's fields are addressed by what they say, not by their position:
+  /// the canvas puts "who are you suing" above the charge, so an index would
+  /// silently point at a different box every time the layout moves.
+  Finder fieldWithHint(String hint) => find.ancestor(
+    of: find.byWidgetPredicate(
+      (w) => w is TextField && w.decoration?.hintText == hint,
+    ),
+    matching: find.byType(TextFormField),
+  );
+
+  final titleField = fieldWithHint('The Last Pizza Slice');
+  final chargeField = fieldWithHint('State the crime. Be dramatic.');
+  final nicknameField = fieldWithHint('SliceBandit');
+
   group('create-case form validation', () {
     testWidgets('rejects an empty form and does not call the API', (
       tester,
@@ -36,7 +51,7 @@ void main() {
 
     testWidgets('rejects a title that is too short', (tester) async {
       await pump(tester);
-      await tester.enterText(find.byType(TextFormField).first, 'ab');
+      await tester.enterText(titleField, 'ab');
       await tester.tap(find.text('File the case'));
       await tester.pumpAndSettle();
 
@@ -47,10 +62,10 @@ void main() {
     testWidgets('rejects an accusation that is too short', (tester) async {
       await pump(tester);
       await tester.enterText(
-        find.byType(TextFormField).first,
+        titleField,
         'The Last Pizza Slice',
       );
-      await tester.enterText(find.byType(TextFormField).at(1), 'too short');
+      await tester.enterText(chargeField, 'too short');
       await tester.tap(find.text('File the case'));
       await tester.pumpAndSettle();
 
@@ -63,14 +78,14 @@ void main() {
     ) async {
       await pump(tester);
       await tester.enterText(
-        find.byType(TextFormField).first,
+        titleField,
         '  The Last Pizza Slice  ',
       );
       await tester.enterText(
-        find.byType(TextFormField).at(1),
+        chargeField,
         '  They ate the last slice right after saying they were full.  ',
       );
-      await tester.enterText(find.byType(TextFormField).at(2), 'SliceBandit');
+      await tester.enterText(nicknameField, 'SliceBandit');
 
       await tester.tap(find.text('💬  Group chat'));
       await tester.pumpAndSettle();
@@ -94,7 +109,7 @@ void main() {
       await pump(tester);
       expect(find.text('1000 characters left'), findsOneWidget);
 
-      await tester.enterText(find.byType(TextFormField).at(1), 'abcde');
+      await tester.enterText(chargeField, 'abcde');
       await tester.pump();
       expect(find.text('995 characters left'), findsOneWidget);
     });
@@ -112,11 +127,11 @@ void main() {
       await pump(tester);
 
       await tester.enterText(
-        find.byType(TextFormField).first,
+        titleField,
         'The Last Pizza Slice',
       );
       await tester.enterText(
-        find.byType(TextFormField).at(1),
+        chargeField,
         'They ate the last slice after saying they were full.',
       );
       await tester.tap(find.text('File the case'));
@@ -136,11 +151,11 @@ void main() {
       await pump(tester);
 
       await tester.enterText(
-        find.byType(TextFormField).first,
+        titleField,
         'The Last Pizza Slice',
       );
       await tester.enterText(
-        find.byType(TextFormField).at(1),
+        chargeField,
         'They ate the last slice after saying they were full.',
       );
       await tester.tap(find.text('File the case'));
@@ -153,7 +168,7 @@ void main() {
       // The typed title survives the failure, so a retry costs no re-typing.
       final title = tester.widget<TextField>(
         find.descendant(
-          of: find.byType(TextFormField).first,
+          of: titleField,
           matching: find.byType(TextField),
         ),
       );
@@ -165,11 +180,11 @@ void main() {
     ) async {
       await pump(tester);
       await tester.enterText(
-        find.byType(TextFormField).first,
+        titleField,
         'The Last Pizza Slice',
       );
       await tester.enterText(
-        find.byType(TextFormField).at(1),
+        chargeField,
         'They ate the last slice after saying they were full.',
       );
 

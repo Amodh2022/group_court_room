@@ -269,6 +269,41 @@ class ApiClient {
         .toList(),
   );
 
+  // --- the jury box -------------------------------------------------------
+  //
+  // Unauthenticated on the server: the jury link *is* the capability. The
+  // signed-in user id is the voter key, so one account is one vote however
+  // many times they open the summons.
+
+  Future<JuryRoom> juryRoom(String token, {required String voterKey}) => _send(
+    () => _dio.get(
+      '/api/v1/jury/$token',
+      queryParameters: {'voter': voterKey},
+      options: _options,
+    ),
+    (data) => JuryRoom.fromJson(data as Map<String, dynamic>),
+  );
+
+  Future<JuryTally> castVote(
+    String token, {
+    required String vote,
+    required String voterKey,
+    String? jurorName,
+  }) => _send(
+    () => _dio.post(
+      '/api/v1/jury/$token/vote',
+      data: {
+        'voter_key': voterKey,
+        'vote': vote,
+        if (jurorName != null && jurorName.isNotEmpty) 'juror_name': jurorName,
+      },
+      options: _options,
+    ),
+    (data) => JuryTally.fromJson(
+      (data as Map<String, dynamic>)['tally'] as Map<String, dynamic>,
+    ),
+  );
+
   Future<NotificationFeed> notifications() => _send(
     () => _dio.get('/api/v1/notifications', options: _options),
     (data) => NotificationFeed.fromJson(data as Map<String, dynamic>),

@@ -34,14 +34,21 @@ void main() {
       await pump(tester);
       await tester.pumpAndSettle();
 
+      // The ruling itself is the screen; the court's working is one tap away.
       expect(find.text('The Last Pizza Slice'), findsOneWidget);
       expect(find.text('Alleged food misconduct'), findsOneWidget);
-      expect(find.text(testVerdict.prosecutionSummary), findsOneWidget);
-      expect(find.text(testVerdict.defenseSummary), findsOneWidget);
-      expect(find.text(testVerdict.reasoning), findsOneWidget);
       expect(find.text(testVerdict.sentence), findsOneWidget);
       expect(find.text('“${testVerdict.judgeRoast}”'), findsOneWidget);
       expect(find.text(testVerdict.closingLine), findsOneWidget);
+
+      expect(find.text(testVerdict.reasoning), findsNothing);
+      await scrollTo(tester, find.text('How the court got there'));
+      await tester.tap(find.text('How the court got there'));
+      await tester.pumpAndSettle();
+
+      expect(find.text(testVerdict.prosecutionSummary), findsOneWidget);
+      expect(find.text(testVerdict.defenseSummary), findsOneWidget);
+      expect(find.text(testVerdict.reasoning), findsOneWidget);
     });
 
     testWidgets('stamps the verdict', (tester) async {
@@ -96,12 +103,12 @@ void main() {
       expect(find.textContaining('court.test/verdict'), findsNothing);
       expect(api.shareCalls, 0);
 
-      await scrollTo(tester, find.text('Publish and share the verdict'));
-      await tester.tap(find.text('Publish and share the verdict'));
+      await scrollTo(tester, find.text('Post to the group chat'));
+      await tester.tap(find.text('Post to the group chat'));
       await tester.pumpAndSettle();
 
       expect(api.shareCalls, 1);
-      expect(find.text('Public link is live'), findsOneWidget);
+      expect(find.text('PUBLIC LINK IS LIVE'), findsOneWidget);
       expect(find.text('https://court.test/verdict/shr_test'), findsOneWidget);
       // The share sheet got the caption and the public URL, nothing private.
       expect(
@@ -115,7 +122,7 @@ void main() {
       await tester.pumpAndSettle();
 
       expect(api.revokeCalls, 1);
-      expect(find.text('Publish and share the verdict'), findsOneWidget);
+      expect(find.text('Post to the group chat'), findsOneWidget);
     });
   });
 

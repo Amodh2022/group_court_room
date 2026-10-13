@@ -154,7 +154,7 @@ def jurisdiction_refusal(case_title: str) -> dict:
         "verdict": "insufficient_evidence",
         "reasoning": (
             "This case raises something more serious than a group-chat squabble. "
-            "Group Chat Court is a comedy game and will not turn it into a punchline."
+            "Sue Me is a comedy game and will not turn it into a punchline."
         ),
         "sentence": "No sentence. Please talk this through properly, or with someone you trust.",
         "judge_roast": "The court has nothing funny to say here, and that is deliberate.",

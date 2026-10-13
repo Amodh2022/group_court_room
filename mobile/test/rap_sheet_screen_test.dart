@@ -1,6 +1,5 @@
 import 'package:flutter_test/flutter_test.dart';
 import 'package:group_chat_court/core/api_client.dart';
-import 'package:group_chat_court/core/widgets/court_layout.dart';
 import 'package:group_chat_court/features/auth/data/auth_providers.dart';
 import 'package:group_chat_court/features/records/presentation/rap_sheet_screen.dart';
 
@@ -21,7 +20,9 @@ void main() {
     );
   }
 
-  testWidgets('lists the records this court has accumulated', (tester) async {
+  testWidgets('puts the top three on the podium with their count', (
+    tester,
+  ) async {
     api.records = [
       buildRecord(displayName: 'SliceBandit', rank: 1, convictions: 4),
       buildRecord(
@@ -41,33 +42,44 @@ void main() {
     expect(find.text('Alex'), findsOneWidget);
     expect(find.text('Repeat Offender'), findsOneWidget);
     expect(find.text('Clean Record'), findsOneWidget);
-    // Convictions are the headline number on the person's own card...
-    final card = find.ancestor(
-      of: find.text('SliceBandit'),
-      matching: find.byType(SpineCard),
-    );
-    expect(find.descendant(of: card, matching: find.text('4')), findsOneWidget);
-    // ...and the standings strip totals them across the court.
-    expect(find.text('Convictions'), findsOneWidget);
+    // The number one is wanted, and their count is on their plinth.
+    expect(find.text('WANTED'), findsOneWidget);
+    expect(find.text('4 guilty'), findsOneWidget);
   });
 
-  testWidgets('shows a streak only once it is worth mentioning', (
+  testWidgets('everyone past the podium gets a row with their record', (
     tester,
   ) async {
     api.records = [
-      buildRecord(displayName: 'Streaky', rank: 1, currentStreak: 3),
-      buildRecord(
-        id: 'offender-2',
-        displayName: 'Occasional',
-        rank: 2,
-        currentStreak: 1,
-      ),
+      for (var i = 1; i <= 4; i++)
+        buildRecord(
+          id: 'offender-$i',
+          displayName: 'Person $i',
+          rank: i,
+          convictions: 5 - i,
+        ),
     ];
     await pump(tester);
     await tester.pumpAndSettle();
 
-    expect(find.text('3-case streak'), findsOneWidget);
-    expect(find.text('1-case streak'), findsNothing);
+    // Ranks one to three are on plinths; rank four is the first list row.
+    expect(find.text('4'), findsWidgets);
+    expect(find.text('Person 4'), findsOneWidget);
+    expect(find.text('GUILTY'), findsOneWidget);
+    expect(find.text('Mistrial'), findsOneWidget);
+  });
+
+  testWidgets('the stage totals the court, not one person', (tester) async {
+    api.records = [
+      buildRecord(displayName: 'Streaky', rank: 1, longestStreak: 3),
+      buildRecord(id: 'offender-2', displayName: 'Occasional', rank: 2),
+    ];
+    await pump(tester);
+    await tester.pumpAndSettle();
+
+    expect(find.text('Longest streak'), findsOneWidget);
+    expect(find.text('Conviction rate'), findsOneWidget);
+    expect(find.text('Cases tried'), findsOneWidget);
   });
 
   testWidgets('an empty sheet invites a first case', (tester) async {

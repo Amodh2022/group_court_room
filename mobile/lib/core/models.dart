@@ -529,3 +529,48 @@ class NotificationFeed {
             .toList(),
       );
 }
+
+/// What a juror sees when they open a summons. The tally stays null until
+/// they have voted: seeing the running count first would turn a vote into a
+/// poll, and the point is committing before you know.
+class JuryRoom {
+  const JuryRoom({
+    required this.caseTitle,
+    required this.accusation,
+    required this.defense,
+    required this.plaintiffName,
+    required this.defendantName,
+    required this.juryOpen,
+    required this.verdictReady,
+    required this.yourVote,
+    required this.tally,
+  });
+
+  final String caseTitle;
+  final String accusation;
+  final String? defense;
+  final String plaintiffName;
+  final String defendantName;
+  final bool juryOpen;
+  final bool verdictReady;
+
+  /// 'guilty', 'not_guilty', or null when this juror has not voted.
+  final String? yourVote;
+  final JuryTally? tally;
+
+  bool get hasVoted => yourVote != null;
+
+  factory JuryRoom.fromJson(Map<String, dynamic> json) => JuryRoom(
+    caseTitle: json['case_title'] as String? ?? '',
+    accusation: json['accusation'] as String? ?? '',
+    defense: json['defense'] as String?,
+    plaintiffName: json['plaintiff_name'] as String? ?? '',
+    defendantName: json['defendant_name'] as String? ?? '',
+    juryOpen: json['jury_open'] as bool? ?? false,
+    verdictReady: json['verdict_ready'] as bool? ?? false,
+    yourVote: json['your_vote'] as String?,
+    tally: json['tally'] == null
+        ? null
+        : JuryTally.fromJson(json['tally'] as Map<String, dynamic>),
+  );
+}

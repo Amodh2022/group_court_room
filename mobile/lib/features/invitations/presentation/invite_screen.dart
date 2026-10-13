@@ -6,6 +6,7 @@ import 'package:share_plus/share_plus.dart';
 
 import '../../../core/models.dart';
 import '../../../core/theme.dart';
+import '../../../core/widgets/court_icons.dart';
 import '../../../core/widgets/court_layout.dart';
 import '../../../core/widgets/court_widgets.dart';
 
@@ -28,6 +29,17 @@ class InviteScreen extends ConsumerWidget {
     return CourtScaffold(
       title: 'Summons issued',
       automaticallyImplyLeading: false,
+      header: ScreenHeader(
+        title: 'Summons issued',
+        eyebrow: 'CASE FILED',
+        titleSize: 28,
+        padding: const EdgeInsets.fromLTRB(16, 18, 20, 10),
+        leading: RoundIconButton(
+          glyph: CourtGlyph.close,
+          label: 'Open the case file',
+          onTap: () => context.go('/cases/$caseId'),
+        ),
+      ),
       body: url == null
           ? CourtNotice(
               icon: Icons.link_off,
@@ -35,22 +47,26 @@ class InviteScreen extends ConsumerWidget {
               message:
                   'A summons link is shown only once, when the case is filed. '
                   'Open the case to check whether a defense has arrived.',
-              action: FilledButton(
+              action: CourtKey(
+                label: 'Open the case',
+                glyph: CourtGlyph.doc,
                 onPressed: () => context.go('/cases/$caseId'),
-                child: const Text('Open the case'),
               ),
             )
           : ListView(
               padding: const EdgeInsets.only(bottom: 32),
               children: [
-                PageTitle(
-                  label: 'Case filed',
-                  title: 'Summon the defendant',
-                  subtitle:
-                      'Two links go out. One summons '
-                      '${created!.defendantNickname ?? 'your friend'} to answer '
-                      'the charge; the other seats the rest of the group as the '
-                      'jury. Nobody sees the ruling until they have voted.',
+                Padding(
+                  padding: const EdgeInsets.fromLTRB(20, 0, 20, 18),
+                  child: Text(
+                    'Two links go out. One summons '
+                    '${created!.defendantNickname ?? 'your friend'} to answer '
+                    'the charge; the other seats the rest of the group as the '
+                    'jury. Nobody sees the ruling until they have voted.',
+                    style: context.text.bodyMedium?.copyWith(
+                      color: context.palette.inkDim,
+                    ),
+                  ),
                 ),
                 Padding(
                   padding: const EdgeInsets.symmetric(horizontal: 20),

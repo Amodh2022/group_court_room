@@ -142,6 +142,9 @@ class FakeApiClient implements ApiClient {
   NotificationFeed feed = const NotificationFeed(unread: 0, items: []);
   int readAllCalls = 0;
 
+  /// (caseId, userId, role) for every seat taken through the app.
+  final List<(String, String, String)> seated = [];
+
   @override
   Future<List<UserRef>> searchUsers(String query) async =>
       people.where((u) => u.handle.startsWith(query.toLowerCase())).toList();
@@ -190,7 +193,65 @@ class FakeApiClient implements ApiClient {
   Future<void> removeCourtMember(String courtId, String userId) async {}
 
   @override
-  Future<void> addCaseMember(String caseId, String userId, String role) async {}
+  Future<void> addCaseMember(String caseId, String userId, String role) async {
+    seated.add((caseId, userId, role));
+  }
+
+  /// The jury box. `rooms` is keyed by jury token; a token with no entry
+  /// behaves like a summons the court has not opened yet.
+  Map<String, JuryRoom> rooms = {};
+
+  /// (token, vote, voterKey) for every ballot cast through the app.
+  final List<(String, String, String)> ballots = [];
+  ApiException? voteError;
+
+  @override
+  Future<JuryRoom> juryRoom(String token, {required String voterKey}) async =>
+      rooms[token] ??
+      const JuryRoom(
+        caseTitle: 'A case',
+        accusation: 'Something petty happened.',
+        defense: null,
+        plaintiffName: 'Alex',
+        defendantName: 'Sam',
+        juryOpen: true,
+        verdictReady: false,
+        yourVote: null,
+        tally: null,
+      );
+
+  @override
+  Future<JuryTally> castVote(
+    String token, {
+    required String vote,
+    required String voterKey,
+    String? jurorName,
+  }) async {
+    if (voteError != null) throw voteError!;
+    ballots.add((token, vote, voterKey));
+    final existing = rooms[token];
+    rooms = {
+      ...rooms,
+      token: JuryRoom(
+        caseTitle: existing?.caseTitle ?? 'A case',
+        accusation: existing?.accusation ?? 'Something petty happened.',
+        defense: existing?.defense,
+        plaintiffName: existing?.plaintiffName ?? 'Alex',
+        defendantName: existing?.defendantName ?? 'Sam',
+        juryOpen: true,
+        verdictReady: false,
+        yourVote: vote,
+        tally: null,
+      ),
+    };
+    return JuryTally(
+      guilty: vote == 'guilty' ? 1 : 0,
+      notGuilty: vote == 'guilty' ? 0 : 1,
+      total: 1,
+      majority: vote,
+      summary: 'One juror has voted.',
+    );
+  }
 
   @override
   Future<List<SharedCase>> sharedCases() async => shared;
@@ -362,6 +423,7 @@ RapSheetEntry buildRecord({
   int convictions = 3,
   int acquittals = 1,
   int currentStreak = 2,
+  int? longestStreak,
 }) => RapSheetEntry(
   id: id,
   displayName: displayName,
@@ -372,7 +434,7 @@ RapSheetEntry buildRecord({
   acquittals: acquittals,
   mistrials: 0,
   currentStreak: currentStreak,
-  longestStreak: currentStreak,
+  longestStreak: longestStreak ?? currentStreak,
   convictionRate: 0.75,
 );
 

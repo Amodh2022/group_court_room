@@ -6,30 +6,11 @@ import 'package:intl/intl.dart';
 import '../../../core/api_client.dart';
 import '../../../core/models.dart';
 import '../../../core/theme.dart';
+import '../../../core/widgets/court_icons.dart';
 import '../../../core/widgets/court_layout.dart';
 import '../../../core/widgets/court_widgets.dart';
 import '../../auth/data/auth_providers.dart';
 import '../../courts/data/court_providers.dart';
-
-/// The bell with an unread count. Opens the notification list.
-class NotificationBell extends ConsumerWidget {
-  const NotificationBell({super.key});
-
-  @override
-  Widget build(BuildContext context, WidgetRef ref) {
-    final unread = ref.watch(notificationsProvider).valueOrNull?.unread ?? 0;
-    return IconButton(
-      tooltip: unread > 0 ? 'Notifications ($unread unread)' : 'Notifications',
-      onPressed: () => context.push('/notifications'),
-      icon: Badge(
-        isLabelVisible: unread > 0,
-        label: Text(unread > 9 ? '9+' : '$unread'),
-        backgroundColor: CourtColors.red,
-        child: const Icon(Icons.notifications_none_rounded),
-      ),
-    );
-  }
-}
 
 class NotificationsScreen extends ConsumerStatefulWidget {
   const NotificationsScreen({super.key});
@@ -59,6 +40,19 @@ class _NotificationsScreenState extends ConsumerState<NotificationsScreen> {
 
     return CourtScaffold(
       title: 'Notifications',
+      header: ScreenHeader(
+        title: 'Notifications',
+        eyebrow: feed.valueOrNull == null || feed.valueOrNull!.unread == 0
+            ? 'NOTHING NEW'
+            : '${feed.valueOrNull!.unread} UNREAD',
+        titleSize: 30,
+        padding: const EdgeInsets.fromLTRB(16, 18, 20, 12),
+        leading: RoundIconButton(
+          glyph: CourtGlyph.back,
+          label: 'Back',
+          onTap: () => context.canPop() ? context.pop() : context.go('/'),
+        ),
+      ),
       body: RefreshIndicator(
         onRefresh: () async => ref.refresh(notificationsProvider.future),
         child: feed.when(

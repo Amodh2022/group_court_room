@@ -1,8 +1,11 @@
-import { useEffect, useState } from "react";
+import { useCallback, useEffect, useState } from "react";
 import { Link, useParams } from "react-router-dom";
 
-import { Disclaimer, LoadingCard, Notice, Shell } from "../components/Chrome";
+import { Disclaimer, Notice } from "../components/Chrome";
+import { CourtStage } from "../components/stage/CourtStage";
+import { SceneTitle } from "../components/stage/SceneParts";
 import { VerdictReveal } from "../components/VerdictReveal";
+import type { Scene } from "../lib/stage";
 import { api, type PublicVerdict } from "../lib/api";
 
 type Status = "loading" | "ready" | "invalid";
@@ -13,6 +16,9 @@ export default function VerdictPage() {
   const [verdict, setVerdict] = useState<PublicVerdict | null>(null);
   const [shareNote, setShareNote] = useState<string | null>(null);
   const [reported, setReported] = useState(false);
+  const [revealed, setRevealed] = useState<"rise" | "verdict">("rise");
+
+  const onStage = useCallback((next: "rise" | "verdict") => setRevealed(next), []);
 
   useEffect(() => {
     let cancelled = false;
@@ -22,7 +28,7 @@ export default function VerdictPage() {
         if (cancelled) return;
         setVerdict(data);
         setStatus("ready");
-        document.title = `${data.case_title} — Group Chat Court`;
+        document.title = `${data.case_title} — Sue Me`;
       })
       .catch(() => {
         if (!cancelled) setStatus("invalid");
@@ -35,7 +41,7 @@ export default function VerdictPage() {
   async function handleShare() {
     if (!verdict) return;
     const url = window.location.href;
-    const shareData = { title: "Group Chat Court", text: verdict.share_caption, url };
+    const shareData = { title: "Sue Me", text: verdict.share_caption, url };
 
     if (navigator.share) {
       try {
@@ -64,31 +70,44 @@ export default function VerdictPage() {
 
   if (status === "loading") {
     return (
-      <Shell>
-        <LoadingCard label="Fetching the verdict" />
-      </Shell>
+      <CourtStage scene="arrival">
+        <SceneTitle label="Approaching the bench">Fetching the verdict…</SceneTitle>
+      </CourtStage>
     );
   }
 
   if (status === "invalid") {
     return (
-      <Shell>
+      <CourtStage scene="record">
         <Notice emoji="🔒" title="This verdict is no longer public">
           The person who shared it may have revoked the link, or it may never have existed.
         </Notice>
-        <Link className="btn" to="/file">
+        <Link className="btn scene-next" to="/file">
           Start your own case
         </Link>
         <Disclaimer />
-      </Shell>
+      </CourtStage>
     );
   }
 
-  return (
-    <Shell>
-      <VerdictReveal verdict={verdict!} />
+  // The camera is wherever the theatre is: pushed at the bench while the beats
+  // play, then released the moment the card lands.
+  const scene: Scene = revealed;
 
-      <button className="btn" type="button" onClick={handleShare}>
+  return (
+    <CourtStage
+      scene={scene}
+      hud={
+        <Link className="chip" to="/">
+          Sue&nbsp;Me
+        </Link>
+      }
+    >
+      <VerdictReveal verdict={verdict!} onStage={onStage} />
+
+      {revealed === "verdict" && (
+        <>
+      <button className="btn scene-next" type="button" onClick={handleShare}>
         Share this verdict
       </button>
       {shareNote && (
@@ -97,7 +116,7 @@ export default function VerdictPage() {
         </p>
       )}
 
-      <Link className="btn btn-secondary" to="/file">
+      <Link className="btn btn-secondary scene-next" to="/file">
         Take your own case to court
       </Link>
 
@@ -117,6 +136,8 @@ export default function VerdictPage() {
           Report this verdict
         </button>
       )}
-    </Shell>
+        </>
+      )}
+    </CourtStage>
   );
 }

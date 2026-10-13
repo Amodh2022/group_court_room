@@ -69,7 +69,8 @@ void main() {
     testWidgets('a restored session lands on the dashboard', (tester) async {
       final router = await pumpApp(tester, signedIn: true);
       expect(router.state.matchedLocation, '/');
-      expect(find.text('Sue Me'), findsWidgets);
+      // The canvas has no app bar: the dashboard greets you by name instead.
+      expect(find.text('Alex'), findsWidgets);
     });
 
     testWidgets('signing in moves the user to the dashboard', (tester) async {
@@ -104,7 +105,7 @@ void main() {
       await tester.pumpAndSettle();
 
       expect(router.state.matchedLocation, '/cases/case-1');
-      expect(find.text('Case file'), findsOneWidget);
+      expect(find.text('The Last Pizza Slice'), findsWidgets);
     });
 
     testWidgets('opens the verdict screen directly', (tester) async {
@@ -118,7 +119,7 @@ void main() {
       router.go('/cases/case-1/verdict');
       await tester.pumpAndSettle();
 
-      expect(find.text('The verdict'), findsOneWidget);
+      expect(find.text(testVerdict.caseTitle), findsWidgets);
       expect(find.byKey(const Key('verdict-stamp')), findsOneWidget);
     });
 

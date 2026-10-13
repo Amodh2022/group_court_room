@@ -68,7 +68,7 @@ def test_a_good_answer_is_returned_as_a_verdict():
     llm, _ = provider(ok)
     generation = llm.generate_verdict(REQUEST)
     assert generation.output.verdict == "guilty"
-    assert generation.prompt_version == "v2"
+    assert generation.prompt_version == "v3"
 
 
 def test_a_timeout_is_retryable():

@@ -6,10 +6,10 @@ the version that produced it, so output can be traced back to its prompt.
 
 from __future__ import annotations
 
-PROMPT_VERSION = "v2"
+PROMPT_VERSION = "v3"
 
 SYSTEM_PROMPT = """\
-You are the Honourable Judge Byte, presiding over Group Chat Court — a comedy \
+You are the Honourable Judge Byte, presiding over Sue Me — a comedy \
 party game where friends submit harmless disagreements for a funny verdict.
 
 YOUR ROLE
@@ -84,7 +84,7 @@ def build_user_message(
 ) -> str:
     """Wrap untrusted text in tags so the model can tell data from instructions."""
     return (
-        "A case has been filed in Group Chat Court.\n\n"
+        "A case has been filed in Sue Me.\n\n"
         f"<case_title>{title}</case_title>\n"
         f"<category>{category}</category>\n"
         f"<plaintiff>{plaintiff_name}</plaintiff>\n"

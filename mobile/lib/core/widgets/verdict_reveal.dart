@@ -1,9 +1,11 @@
 import 'dart:async';
 
 import 'package:flutter/material.dart';
+import 'package:flutter/services.dart';
 
 import '../models.dart';
 import '../theme.dart';
+import 'court_stage.dart';
 
 /// One line of courtroom theatre.
 class _Beat {
@@ -26,10 +28,16 @@ class VerdictReveal extends StatefulWidget {
     required this.verdict,
     required this.tally,
     required this.child,
+    this.onStage,
   });
 
   final Verdict verdict;
   final JuryTally? tally;
+
+  /// Fires with [CourtScene.rise] while the beats play and [CourtScene.verdict]
+  /// once the ruling lands, so a stage above can move the camera in step with
+  /// the theatre.
+  final ValueChanged<CourtScene>? onStage;
 
   /// The full ruling, shown once the sequence finishes.
   final Widget child;
@@ -74,6 +82,43 @@ class _VerdictRevealState extends State<VerdictReveal> {
     } else {
       _schedule();
     }
+    _announce();
+  }
+
+  /// Told after the frame, never during build: the listener above is a parent,
+  /// and setting its state mid-build is an error.
+  void _announce() {
+    final done = _index >= _beats.length;
+    if (done) _landed();
+    final notify = widget.onStage;
+    if (notify == null) return;
+    final stage = done ? CourtScene.verdict : CourtScene.rise;
+    WidgetsBinding.instance.addPostFrameCallback((_) {
+      if (mounted) notify(stage);
+    });
+  }
+
+  bool _hasLanded = false;
+
+  /// The ruling arriving, in the hand. The gavel strike itself belongs to the
+  /// stage — this is the stamp coming down after it, and it fires once however
+  /// the sequence ended, skipped or played in full.
+  void _landed() {
+    if (_hasLanded) return;
+    _hasLanded = true;
+    if (!mounted || MediaQuery.disableAnimationsOf(context)) return;
+
+    final overruled = widget.verdict.verdict.overrules(widget.tally);
+    if (!overruled) {
+      HapticFeedback.mediumImpact();
+      return;
+    }
+    // The best outcome in the game gets its own rhythm, so a player learns to
+    // recognise it before they have read a word: strike, beat, strike.
+    HapticFeedback.heavyImpact();
+    Future.delayed(const Duration(milliseconds: 160), () {
+      if (mounted) HapticFeedback.heavyImpact();
+    });
   }
 
   void _schedule() {
@@ -82,6 +127,7 @@ class _VerdictRevealState extends State<VerdictReveal> {
     _timer = Timer(Duration(milliseconds: _beats[_index].ms), () {
       if (!mounted) return;
       setState(() => _index++);
+      _announce();
       _schedule();
     });
   }
@@ -89,6 +135,7 @@ class _VerdictRevealState extends State<VerdictReveal> {
   void _skip() {
     _timer?.cancel();
     setState(() => _index = _beats.length);
+    _announce();
   }
 
   @override

@@ -79,13 +79,45 @@ def notify(
     push_service.queue(db, user_id, text, kind=kind, case_id=case_id, court_id=court_id)
 
 
+def notify_case(
+    db: Session, case: Case, kind: str, text: str, *, exclude: uuid.UUID | None = None,
+) -> None:
+    """Tell everyone following a case that something happened to it.
+
+    That is the creator plus anyone seated through a direct case member row —
+    the accused and the jurors who have accounts. Jurors who joined by link
+    alone have no user to notify; the courtroom tells them instead.
+
+    [exclude] is for the person who caused the event: being told you filed your
+    own defense is noise, and noise spends the daily push cap.
+
+    Rows are added to the caller's session and go out when it commits, so the
+    notification and the thing it announces land together or not at all.
+    """
+    seen: set[uuid.UUID] = set()
+    for user_id in (
+        case.creator_id,
+        *db.execute(
+            select(CaseMember.user_id).where(CaseMember.case_id == case.id)
+        ).scalars(),
+    ):
+        if user_id is None or user_id == exclude or user_id in seen:
+            continue
+        seen.add(user_id)
+        notify(db, user_id, kind, text, case_id=case.id)
+
+
 # --- courts ----------------------------------------------------------------
+
+# No 0/O/1/I/L: invite codes get read aloud and retyped from screenshots.
+_INVITE_ALPHABET = "ABCDEFGHJKMNPQRSTUVWXYZ23456789"
+_LOOKALIKES = str.maketrans("01IL", "OOOO")
 
 
 def create_court(db: Session, user: User, name: str) -> Court:
     court = Court(
         id=uuid.uuid4(), name=name.strip(), owner_id=user.id,
-        invite_code=secrets.token_urlsafe(6)[:8].upper(),
+        invite_code="".join(secrets.choice(_INVITE_ALPHABET) for _ in range(8)),
     )
     db.add(court)
     db.flush()
@@ -132,9 +164,12 @@ def add_court_member(db: Session, court: Court, actor: User, user_id: uuid.UUID)
 
 
 def join_court(db: Session, user: User, code: str) -> Court:
-    court = db.execute(
-        select(Court).where(Court.invite_code == code.strip().upper())
-    ).scalar_one_or_none()
+    # Older codes can contain look-alike characters; match with those folded.
+    wanted = code.strip().upper().translate(_LOOKALIKES)
+    folded = Court.invite_code
+    for ch in "01IL":
+        folded = func.replace(folded, ch, "O")
+    court = db.execute(select(Court).where(folded == wanted)).scalars().first()
     if court is None:
         raise errors.not_found("Court")
     if not is_member(court, user.id):

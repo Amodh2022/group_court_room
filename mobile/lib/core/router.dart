@@ -14,6 +14,7 @@ import '../features/records/presentation/rap_sheet_screen.dart';
 import '../features/settings/presentation/settings_screen.dart';
 import '../features/verdicts/presentation/verdict_screen.dart';
 import 'models.dart';
+import 'widgets/court_layout.dart';
 
 /// Rebuilds the router's redirect whenever the sign-in state changes.
 class _AuthRefresh extends ChangeNotifier {
@@ -45,68 +46,96 @@ final routerProvider = Provider<GoRouter>((ref) {
         name: 'sign-in',
         builder: (_, __) => const SignInScreen(),
       ),
+
+      // The four tabs. A StatefulShellRoute keeps the navigation pill mounted
+      // and gives each tab its own branch, so switching tabs no longer rebuilds
+      // the bar and no longer throws away where you were in the other tabs.
+      // The branches are in CourtTab order — CourtShell indexes into it.
+      StatefulShellRoute.indexedStack(
+        builder: (_, __, shell) => CourtShell(navigationShell: shell),
+        branches: [
+          StatefulShellBranch(
+            routes: [
+              GoRoute(
+                path: '/',
+                name: 'dashboard',
+                builder: (_, __) => const DashboardScreen(),
+              ),
+            ],
+          ),
+          StatefulShellBranch(
+            routes: [
+              GoRoute(
+                path: '/courts',
+                name: 'courts',
+                builder: (_, __) => const CourtsScreen(),
+                routes: [
+                  GoRoute(
+                    path: ':courtId',
+                    name: 'court-detail',
+                    builder: (_, state) => CourtDetailScreen(
+                      courtId: state.pathParameters['courtId']!,
+                    ),
+                  ),
+                ],
+              ),
+            ],
+          ),
+          StatefulShellBranch(
+            routes: [
+              GoRoute(
+                path: '/rap-sheet',
+                name: 'rap-sheet',
+                builder: (_, __) => const RapSheetScreen(),
+              ),
+            ],
+          ),
+          StatefulShellBranch(
+            routes: [
+              GoRoute(
+                path: '/settings',
+                name: 'settings',
+                builder: (_, __) => const SettingsScreen(),
+              ),
+            ],
+          ),
+        ],
+      ),
+
+      // Everything below covers the whole screen, pill included: filing, a
+      // case file, the ruling and the alert list are all takeovers, which is
+      // how the canvas draws them.
       GoRoute(
-        path: '/',
-        name: 'dashboard',
-        builder: (_, __) => const DashboardScreen(),
+        path: '/notifications',
+        name: 'notifications',
+        builder: (_, __) => const NotificationsScreen(),
+      ),
+      GoRoute(
+        path: '/cases/new',
+        name: 'create-case',
+        builder: (_, state) =>
+            CreateCaseScreen(courtId: state.uri.queryParameters['court']),
+      ),
+      GoRoute(
+        path: '/cases/:caseId',
+        name: 'case-detail',
+        builder: (_, state) =>
+            CaseDetailScreen(caseId: state.pathParameters['caseId']!),
         routes: [
           GoRoute(
-            path: 'settings',
-            name: 'settings',
-            builder: (_, __) => const SettingsScreen(),
+            path: 'invite',
+            name: 'case-invite',
+            builder: (_, state) => InviteScreen(
+              caseId: state.pathParameters['caseId']!,
+              // Carries the one-time invite token from the create call.
+              created: state.extra as CaseDetail?,
+            ),
           ),
           GoRoute(
-            path: 'courts',
-            name: 'courts',
-            builder: (_, __) => const CourtsScreen(),
-            routes: [
-              GoRoute(
-                path: ':courtId',
-                name: 'court-detail',
-                builder: (_, state) => CourtDetailScreen(
-                  courtId: state.pathParameters['courtId']!,
-                ),
-              ),
-            ],
-          ),
-          GoRoute(
-            path: 'notifications',
-            name: 'notifications',
-            builder: (_, __) => const NotificationsScreen(),
-          ),
-          GoRoute(
-            path: 'rap-sheet',
-            name: 'rap-sheet',
-            builder: (_, __) => const RapSheetScreen(),
-          ),
-          GoRoute(
-            path: 'cases/new',
-            name: 'create-case',
+            path: 'verdict',
+            name: 'case-verdict',
             builder: (_, state) =>
-                CreateCaseScreen(courtId: state.uri.queryParameters['court']),
-          ),
-          GoRoute(
-            path: 'cases/:caseId',
-            name: 'case-detail',
-            builder: (_, state) =>
-                CaseDetailScreen(caseId: state.pathParameters['caseId']!),
-            routes: [
-              GoRoute(
-                path: 'invite',
-                name: 'case-invite',
-                builder: (_, state) => InviteScreen(
-                  caseId: state.pathParameters['caseId']!,
-                  // Carries the one-time invite token from the create call.
-                  created: state.extra as CaseDetail?,
-                ),
-              ),
-              GoRoute(
-                path: 'verdict',
-                name: 'case-verdict',
-                builder: (_, state) =>
-                    VerdictScreen(caseId: state.pathParameters['caseId']!),
-              ),
-            ],
+                VerdictScreen(caseId: state.pathParameters['caseId']!),
           ),
         ],
       ),

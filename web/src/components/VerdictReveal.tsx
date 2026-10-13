@@ -55,12 +55,17 @@ function buildBeats(verdict: PublicVerdict, yourVote: JuryVote | null): Beat[] {
 export function VerdictReveal({
   verdict,
   yourVote = null,
+  onStage,
 }: {
   verdict: PublicVerdict;
   yourVote?: JuryVote | null;
+  /** Fires with "rise" while the beats play and "verdict" once the card lands,
+   *  so a stage above can move the camera in step with the theatre. */
+  onStage?: (stage: "rise" | "verdict") => void;
 }) {
   const beats = useMemo(() => buildBeats(verdict, yourVote), [verdict, yourVote]);
   const [index, setIndex] = useState(() => (prefersReducedMotion() ? beats.length : 0));
+  const done = index >= beats.length;
 
   useEffect(() => {
     if (index >= beats.length) return;
@@ -68,7 +73,11 @@ export function VerdictReveal({
     return () => window.clearTimeout(timer);
   }, [index, beats]);
 
-  if (index >= beats.length) {
+  useEffect(() => {
+    onStage?.(done ? "verdict" : "rise");
+  }, [done, onStage]);
+
+  if (done) {
     return <VerdictCard verdict={verdict} animate />;
   }
 

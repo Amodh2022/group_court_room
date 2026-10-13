@@ -160,7 +160,7 @@ class PublicVerdict(BaseModel):
     jury_overruled: bool = False
     decided_at: datetime
     disclaimer: str = (
-        "Group Chat Court is a comedy game. This verdict is entertainment, not a "
+        "Sue Me is a comedy game. This verdict is entertainment, not a "
         "finding of fact and not legal advice."
     )
 

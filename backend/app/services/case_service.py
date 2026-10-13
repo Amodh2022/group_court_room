@@ -25,7 +25,7 @@ from app.models import (
     VerdictJob,
 )
 from app.security.tokens import generate_token, hash_token
-from app.services import errors, offender_service
+from app.services import errors, offender_service, social_service
 
 logger = logging.getLogger(__name__)
 
@@ -253,6 +253,16 @@ def submit_defense(
     if result.rowcount != 1:
         db.rollback()
         raise errors.conflict("This case is no longer accepting a defense.")
+
+    # Queued before the commit so it rides the same transaction: if the insert
+    # below loses the race, the notification is rolled back with it.
+    social_service.notify_case(
+        db,
+        case,
+        "defense_filed",
+        f"{nickname} has answered the charge in “{case.title}”. "
+        "The court can rule whenever you are ready.",
+    )
 
     try:
         db.commit()
