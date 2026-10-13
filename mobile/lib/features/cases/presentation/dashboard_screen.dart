@@ -888,8 +888,24 @@ class _RulingTray extends StatelessWidget {
 }
 
 /// Jury duty and summonses are answered in the browser; hand over the link.
-void showSharedCase(BuildContext context, SharedCase item) {
-  final link = '${Env.webBaseUrl}${item.path}';
+void showSharedCase(BuildContext context, SharedCase item) => showAnswerLink(
+  context,
+  heading: item.title,
+  message:
+      '${item.creatorName} added you as '
+      '${item.role == 'accused' ? 'the accused' : 'a juror'}.',
+  path: item.path,
+);
+
+/// The sheet behind a summons or jury notice: [path] is the web route
+/// (`/invite/<token>` for the defense, `/jury/<token>` for jurors).
+void showAnswerLink(
+  BuildContext context, {
+  required String heading,
+  required String message,
+  required String path,
+}) {
+  final link = '${Env.webBaseUrl}$path';
   showModalBottomSheet<void>(
     context: context,
     showDragHandle: true,
@@ -902,11 +918,10 @@ void showSharedCase(BuildContext context, SharedCase item) {
         mainAxisSize: MainAxisSize.min,
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
-          Text(item.title, style: context.text.headlineSmall),
+          Text(heading, style: context.text.headlineSmall),
           const SizedBox(height: 6),
           Text(
-            '${item.creatorName} added you as '
-            '${item.role == 'accused' ? 'the accused' : 'a juror'}.',
+            message,
             style: context.text.bodyMedium?.copyWith(
               color: context.palette.inkDim,
             ),

@@ -10,6 +10,7 @@ import '../../../core/widgets/court_icons.dart';
 import '../../../core/widgets/court_layout.dart';
 import '../../../core/widgets/court_widgets.dart';
 import '../../auth/data/auth_providers.dart';
+import '../../cases/presentation/dashboard_screen.dart' show showAnswerLink;
 import '../../courts/data/court_providers.dart';
 
 class NotificationsScreen extends ConsumerStatefulWidget {
@@ -121,51 +122,80 @@ class _NotificationTile extends StatelessWidget {
     _ => Icons.how_to_vote_outlined,
   };
 
+  /// Summons go to the defense, jury duty to the jury box, court invites to
+  /// the court; the same routing the web bell uses.
+  void _open(BuildContext context) {
+    final token = item.token;
+    if (item.linkKind == 'invite' && token != null) {
+      showAnswerLink(
+        context,
+        heading: 'Your defense',
+        message: item.text,
+        path: '/invite/$token',
+      );
+    } else if (item.linkKind == 'jury' && token != null) {
+      showAnswerLink(
+        context,
+        heading: 'Jury duty',
+        message: item.text,
+        path: '/jury/$token',
+      );
+    } else if (item.courtId != null) {
+      context.go('/courts/${item.courtId}');
+    }
+  }
+
   @override
-  Widget build(BuildContext context) => CourtCard(
-    padding: const EdgeInsets.all(14),
-    child: Row(
-      children: [
-        Container(
-          width: 44,
-          height: 44,
-          decoration: BoxDecoration(
-            shape: BoxShape.circle,
-            color: context.palette.surfaceAlt,
+  Widget build(BuildContext context) => GestureDetector(
+    behavior: HitTestBehavior.opaque,
+    onTap: () => _open(context),
+    child: CourtCard(
+      padding: const EdgeInsets.all(14),
+      child: Row(
+        children: [
+          Container(
+            width: 44,
+            height: 44,
+            decoration: BoxDecoration(
+              shape: BoxShape.circle,
+              color: context.palette.surfaceAlt,
+            ),
+            child: Icon(_icon, size: 20),
           ),
-          child: Icon(_icon, size: 20),
-        ),
-        const SizedBox(width: 12),
-        Expanded(
-          child: Column(
-            crossAxisAlignment: CrossAxisAlignment.start,
-            children: [
-              Text(
-                item.text,
-                style: TextStyle(
-                  fontWeight: item.read ? FontWeight.w400 : FontWeight.w600,
-                ),
-              ),
-              if (item.createdAt != null)
+          const SizedBox(width: 12),
+          Expanded(
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
                 Text(
-                  DateFormat.MMMd().add_jm().format(item.createdAt!.toLocal()),
-                  style: context.text.bodySmall?.copyWith(
-                    color: context.palette.inkFaint,
+                  item.text,
+                  style: TextStyle(
+                    fontWeight: item.read ? FontWeight.w400 : FontWeight.w600,
                   ),
                 ),
-            ],
-          ),
-        ),
-        if (!item.read)
-          Container(
-            width: 8,
-            height: 8,
-            decoration: const BoxDecoration(
-              color: CourtColors.red,
-              shape: BoxShape.circle,
+                if (item.createdAt != null)
+                  Text(
+                    DateFormat.MMMd().add_jm().format(
+                      item.createdAt!.toLocal(),
+                    ),
+                    style: context.text.bodySmall?.copyWith(
+                      color: context.palette.inkFaint,
+                    ),
+                  ),
+              ],
             ),
           ),
-      ],
+          if (!item.read)
+            Container(
+              width: 8,
+              height: 8,
+              decoration: const BoxDecoration(
+                color: CourtColors.red,
+                shape: BoxShape.circle,
+              ),
+            ),
+        ],
+      ),
     ),
   );
 }
