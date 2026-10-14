@@ -67,6 +67,7 @@ def create_case(payload: CaseCreate, user: CurrentUser, db: DbDep) -> CaseCreate
         accusation=payload.accusation,
         defendant_nickname=nickname,
         court_id=court.id if court else None,
+        petty_level=payload.petty_level,
     )
     if accused is not None:
         social_service.seat_member(db, case, user, accused.id, "accused")
@@ -105,7 +106,10 @@ def rap_sheet(
     limit: Annotated[int, Query(ge=1, le=100)] = 50,
 ) -> list[RapSheetEntry]:
     """Standings in this user's court: who keeps getting convicted."""
-    return serializers.rap_sheet(offender_service.leaderboard(db, user, limit))
+    return serializers.rap_sheet(
+        offender_service.leaderboard(db, user, limit),
+        you=offender_service.slugify(user.display_name or ""),
+    )
 
 
 @router.get("/shared", response_model=list[SharedCase])

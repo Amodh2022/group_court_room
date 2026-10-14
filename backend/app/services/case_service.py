@@ -25,7 +25,7 @@ from app.models import (
     VerdictJob,
 )
 from app.security.tokens import generate_token, hash_token
-from app.services import errors, offender_service, social_service
+from app.services import errors, game_rules, game_service, offender_service, social_service
 
 logger = logging.getLogger(__name__)
 
@@ -99,6 +99,7 @@ def create_case(
     accusation: str,
     defendant_nickname: str | None,
     court_id: uuid.UUID | None = None,
+    petty_level: int = 1,
 ) -> tuple[Case, str, str]:
     """Create a case. Returns `(case, raw_invite_token, raw_jury_token)`.
 
@@ -120,6 +121,10 @@ def create_case(
         raise errors.conflict(
             "You have too many open cases. Finish or delete some before filing another."
         )
+
+    # The filing fee, before anything is written: a case that cannot be paid
+    # for is not filed, and refusing here leaves nothing half-created.
+    game_service.spend_coins(db, user, game_rules.CASE_FILING_COST, reason="file a case")
 
     now = utcnow()
     raw_token, token_hash = generate_token("invite")
@@ -144,6 +149,7 @@ def create_case(
         accusation=accusation,
         status=CaseStatus.draft,
         expires_at=expires_at,
+        petty_level=game_rules.petty_multiplier(petty_level),
         jury_token_hash=jury_token_hash,
         plaintiff_offender_id=plaintiff_record.id if plaintiff_record else None,
         defendant_offender_id=defendant_record.id if defendant_record else None,
@@ -165,6 +171,13 @@ def create_case(
     case.status = CaseStatus.awaiting_defense
     db.commit()
     db.refresh(case)
+
+    # Quests and badges after the commit: the case is already real, and a
+    # bookkeeping failure must not take it back.
+    try:
+        game_service.after_case_filed(db, user, case)
+    except Exception:  # pragma: no cover - the game is never worth a case
+        logger.exception("game.filing_failed", extra={"case_id": str(case.id)})
 
     logger.info("case.created", extra={"case_id": str(case.id), "user_id": str(user.id)})
     return case, raw_token, raw_jury_token

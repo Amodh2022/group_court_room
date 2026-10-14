@@ -40,46 +40,44 @@ void main() {
 
     expect(find.text('SliceBandit'), findsOneWidget);
     expect(find.text('Alex'), findsOneWidget);
-    expect(find.text('Repeat Offender'), findsOneWidget);
-    expect(find.text('Clean Record'), findsOneWidget);
-    // The number one is wanted, and their count is on their plinth.
-    expect(find.text('WANTED'), findsOneWidget);
+    // Each podium place shows the person's real conviction count.
     expect(find.text('4 guilty'), findsOneWidget);
+    expect(find.text('0 guilty'), findsOneWidget);
   });
 
-  testWidgets('everyone past the podium gets a row with their record', (
+  testWidgets('everyone past the podium gets a row with title and pill', (
     tester,
   ) async {
     api.records = [
-      for (var i = 1; i <= 4; i++)
+      for (var i = 1; i <= 5; i++)
         buildRecord(
           id: 'offender-$i',
           displayName: 'Person $i',
           rank: i,
-          convictions: 5 - i,
+          title: 'Title $i',
+          convictions: i == 5 ? 0 : 5 - i,
         ),
     ];
     await pump(tester);
     await tester.pumpAndSettle();
 
-    // Ranks one to three are on plinths; rank four is the first list row.
-    expect(find.text('4'), findsWidgets);
+    // Ranks one to three are on the podium; four and five are list rows.
     expect(find.text('Person 4'), findsOneWidget);
-    expect(find.text('GUILTY'), findsOneWidget);
-    expect(find.text('Mistrial'), findsOneWidget);
+    expect(find.text('Title 4'), findsOneWidget);
+    expect(find.text('1 GUILTY'), findsOneWidget);
+    // Nobody convicted reads as clean, not as "0 guilty".
+    expect(find.text('CLEAN'), findsOneWidget);
   });
 
-  testWidgets('the stage totals the court, not one person', (tester) async {
+  testWidgets('the header totals the court, not one person', (tester) async {
     api.records = [
-      buildRecord(displayName: 'Streaky', rank: 1, longestStreak: 3),
+      buildRecord(displayName: 'Streaky', rank: 1), // 3 + 1 = 4 cases
       buildRecord(id: 'offender-2', displayName: 'Occasional', rank: 2),
     ];
     await pump(tester);
     await tester.pumpAndSettle();
 
-    expect(find.text('Longest streak'), findsOneWidget);
-    expect(find.text('Conviction rate'), findsOneWidget);
-    expect(find.text('Cases tried'), findsOneWidget);
+    expect(find.text('ALL-TIME · 8 CASES'), findsOneWidget);
   });
 
   testWidgets('an empty sheet invites a first case', (tester) async {
@@ -101,5 +99,39 @@ void main() {
 
     expect(find.text('The archive is on fire.'), findsOneWidget);
     expect(find.text('Try again'), findsOneWidget);
+  });
+
+  group('where you stand', () {
+    testWidgets('names the gap to the rank above', (tester) async {
+      api.records = [
+        buildRecord(displayName: 'Dev', rank: 1, convictions: 11),
+        buildRecord(id: 'o-2', displayName: 'Maya', rank: 2, convictions: 8),
+        buildRecord(id: 'o-3', displayName: 'Priya', rank: 3, convictions: 7),
+        buildRecord(id: 'o-4', displayName: 'Arjun', rank: 4, convictions: 5),
+        buildRecord(id: 'o-5', displayName: 'You', rank: 5, convictions: 4,
+            isYou: true),
+      ];
+      await pump(tester);
+      await tester.pumpAndSettle();
+
+      expect(find.textContaining('1 more guilty verdict'), findsOneWidget);
+      expect(find.textContaining('Arjun'), findsWidgets);
+    });
+
+    testWidgets('stays hidden when the court has no record of you', (
+      tester,
+    ) async {
+      // A row carries a record id, never an account id, so the client cannot
+      // work this out itself — an unmarked sheet draws no band.
+      api.records = [
+        buildRecord(displayName: 'Dev', rank: 1, convictions: 11),
+        buildRecord(id: 'o-2', displayName: 'Maya', rank: 2, convictions: 8),
+      ];
+      await pump(tester);
+      await tester.pumpAndSettle();
+
+      expect(find.textContaining('to overtake'), findsNothing);
+      expect(find.textContaining('Top of the sheet'), findsNothing);
+    });
   });
 }

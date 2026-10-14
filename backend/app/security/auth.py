@@ -103,3 +103,24 @@ def get_current_user(
 
 
 CurrentUser = Annotated[User, Depends(get_current_user)]
+
+
+def get_optional_user(
+    db: Annotated[Session, Depends(get_db)],
+    authorization: Annotated[str | None, Header()] = None,
+) -> User | None:
+    """The user behind this request, if there is one.
+
+    For endpoints whose capability is a link rather than an account: the jury
+    box works for anyone holding the token, and a bad or absent header is not
+    an error there. It only decides whether there is somebody to credit.
+    """
+    if not authorization:
+        return None
+    try:
+        return user_from_token(db, _bearer(authorization))
+    except HTTPException:
+        return None
+
+
+OptionalUser = Annotated[User | None, Depends(get_optional_user)]

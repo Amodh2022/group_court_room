@@ -9,6 +9,7 @@ from app.models.enums import (
     JuryVoteKind,
     ParticipantRole,
 )
+from app.models.game import DailyQuest, GameEvent, PlayerBadge, PlayerProfile
 from app.models.job import VerdictJob
 from app.models.jury import JuryVote
 from app.models.offender import Offender
@@ -26,7 +27,9 @@ __all__ = [
     "ChatMessage",
     "Court",
     "CourtMember",
+    "DailyQuest",
     "DeviceToken",
+    "GameEvent",
     "JobStatus",
     "JuryVote",
     "JuryVoteKind",
@@ -34,6 +37,8 @@ __all__ = [
     "Offender",
     "Participant",
     "ParticipantRole",
+    "PlayerBadge",
+    "PlayerProfile",
     "Report",
     "Submission",
     "User",

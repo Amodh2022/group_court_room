@@ -1,5 +1,3 @@
-import 'dart:math' as math;
-
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
@@ -9,19 +7,16 @@ import 'package:share_plus/share_plus.dart';
 import '../../../core/api_client.dart';
 import '../../../core/models.dart';
 import '../../../core/theme.dart';
-import '../../../core/widgets/court_chrome.dart';
 import '../../../core/widgets/court_icons.dart';
-import '../../../core/widgets/court_people.dart';
+import '../../../core/widgets/sue_tablet.dart';
+import '../../../core/widgets/sue_widgets.dart';
 import '../../../core/widgets/court_widgets.dart';
 import '../../../core/widgets/verdict_reveal.dart';
 import '../../cases/data/case_providers.dart';
+import '../../game/data/game_providers.dart';
 
-/// The ruling, drawn to the "Verdict" artboard: a dark room with the light
-/// behind the bench, the stamp slammed down on it, and the judge's words
-/// underneath.
-///
-/// The room is the same colour in light mode and dark mode. A verdict is a
-/// moment, not a page, and the canvas gives it one set of colours.
+/// The ruling, drawn to the "Verdict" artboard: a stage band with the gavel,
+/// the verdict as one huge word, the judge's words, and a share button.
 class VerdictScreen extends ConsumerStatefulWidget {
   const VerdictScreen({super.key, required this.caseId});
 
@@ -114,8 +109,7 @@ class _VerdictScreenState extends ConsumerState<VerdictScreen> {
   }
 }
 
-/// The room itself: ink-plum, the rays behind the bench, and the one piece of
-/// chrome allowed over it — the way out.
+/// The page: a close button, the case label, and whatever the state is.
 class _VerdictRoom extends StatelessWidget {
   const _VerdictRoom({
     required this.caseLabel,
@@ -128,50 +122,61 @@ class _VerdictRoom extends StatelessWidget {
   final Widget child;
 
   @override
-  Widget build(BuildContext context) => Theme(
-    // The room is dark whatever the app's mode, so the widgets inside it read
-    // their own colours from a dark theme rather than second-guessing.
-    data: courtDarkTheme().copyWith(
-      scaffoldBackgroundColor: CourtColors.stageLight,
-    ),
-    child: Scaffold(
-      backgroundColor: CourtColors.stageLight,
-      body: Stack(
-        children: [
-          const Positioned.fill(child: _Rays()),
-          SafeArea(
-            child: Column(
-              children: [
-                Padding(
-                  padding: const EdgeInsets.fromLTRB(16, 10, 16, 0),
-                  child: Row(
-                    children: [
-                      _CloseButton(onTap: onClose),
-                      Expanded(
-                        child: Text(
-                          caseLabel,
-                          textAlign: TextAlign.center,
-                          maxLines: 1,
-                          overflow: TextOverflow.ellipsis,
-                          style: const TextStyle(
-                            fontSize: 13,
-                            fontWeight: FontWeight.w800,
-                            color: CourtColors.stageDim,
-                          ),
-                        ),
-                      ),
-                      const SizedBox(width: 44),
-                    ],
-                  ),
-                ),
-                Expanded(child: child),
-              ],
-            ),
+  Widget build(BuildContext context) {
+    // The tablet artboard opens the ruling with the same loud title row every
+    // other tablet screen uses, inside the canvas's 28px page.
+    if (context.isTablet) {
+      return Scaffold(
+        backgroundColor: context.colors.surface,
+        body: SueTabletPage(
+          header: Row(
+            children: [
+              _CloseButton(onTap: onClose),
+              const SizedBox(width: 14),
+              Expanded(
+                child: SueTabletHeader(title: 'Verdict', subtitle: caseLabel),
+              ),
+            ],
           ),
-        ],
+          child: child,
+        ),
+      );
+    }
+
+    return Scaffold(
+      backgroundColor: context.colors.surface,
+      body: SafeArea(
+        child: Column(
+          children: [
+            Padding(
+              padding: const EdgeInsets.fromLTRB(20, 10, 20, 10),
+              child: Row(
+                children: [
+                  _CloseButton(onTap: onClose),
+                  Expanded(
+                    child: Text(
+                      caseLabel.toUpperCase(),
+                      textAlign: TextAlign.center,
+                      maxLines: 1,
+                      overflow: TextOverflow.ellipsis,
+                      style: TextStyle(
+                        fontSize: 12,
+                        fontWeight: FontWeight.w500,
+                        letterSpacing: 1.5,
+                        color: context.palette.inkDim,
+                      ),
+                    ),
+                  ),
+                  const SizedBox(width: 46),
+                ],
+              ),
+            ),
+            Expanded(child: child),
+          ],
+        ),
       ),
-    ),
-  );
+    );
+  }
 }
 
 class _CloseButton extends StatelessWidget {
@@ -189,124 +194,19 @@ class _CloseButton extends StatelessWidget {
         customBorder: const CircleBorder(),
         onTap: onTap,
         child: Container(
-          width: 44,
-          height: 44,
+          width: 46,
+          height: 46,
           alignment: Alignment.center,
           decoration: BoxDecoration(
             shape: BoxShape.circle,
-            color: CourtColors.stageChipLight,
-            border: Border.all(color: Colors.black, width: courtBorderWidth),
+            color: context.colors.surfaceContainerHighest,
+            boxShadow: courtHardShadow(context),
           ),
-          child: const CourtIcon(
-            CourtGlyph.close,
-            size: 18,
-            color: CourtColors.stageInk,
-            strokeWidth: 3,
-          ),
+          child: const CourtIcon(CourtGlyph.close, size: 18, strokeWidth: 2.6),
         ),
       ),
     ),
   );
-}
-
-/// The light behind the bench: a slow wheel of red rays, faded out into the
-/// room so it never touches the text.
-class _Rays extends StatefulWidget {
-  const _Rays();
-
-  @override
-  State<_Rays> createState() => _RaysState();
-}
-
-class _RaysState extends State<_Rays> with SingleTickerProviderStateMixin {
-  AnimationController? _spin;
-
-  @override
-  void didChangeDependencies() {
-    super.didChangeDependencies();
-    // A controller that repeats forever keeps a frame permanently scheduled,
-    // so `pumpAndSettle` would never return and the GPU would never idle.
-    // Widget tests run with animations disabled, and so does a phone whose
-    // owner asked for less motion — both get a still room.
-    final wants = !MediaQuery.disableAnimationsOf(context);
-    if (wants && _spin == null) {
-      _spin = AnimationController(
-        vsync: this,
-        duration: const Duration(seconds: 40),
-      )..repeat();
-    } else if (!wants && _spin != null) {
-      _spin!.dispose();
-      _spin = null;
-    }
-  }
-
-  @override
-  void dispose() {
-    _spin?.dispose();
-    super.dispose();
-  }
-
-  @override
-  Widget build(BuildContext context) {
-    final painter = _spin == null
-        ? const CustomPaint(painter: _RaysPainter(0))
-        : AnimatedBuilder(
-            animation: _spin!,
-            builder: (_, __) =>
-                CustomPaint(painter: _RaysPainter(_spin!.value)),
-          );
-    return ExcludeSemantics(
-      child: SizedBox.expand(child: RepaintBoundary(child: painter)),
-    );
-  }
-}
-
-class _RaysPainter extends CustomPainter {
-  const _RaysPainter(this.turn);
-
-  final double turn;
-
-  @override
-  void paint(Canvas canvas, Size size) {
-    final centre = Offset(size.width / 2, 240);
-    final radius = size.longestSide * 1.2;
-    final paint = Paint()..color = const Color(0x47FF3B52);
-
-    canvas.save();
-    canvas.translate(centre.dx, centre.dy);
-    canvas.rotate(turn * 2 * math.pi);
-    const wedges = 18;
-    for (var i = 0; i < wedges; i++) {
-      canvas.drawArc(
-        Rect.fromCircle(center: Offset.zero, radius: radius),
-        i * 2 * math.pi / wedges,
-        math.pi / wedges,
-        true,
-        paint,
-      );
-    }
-    canvas.restore();
-
-    // Fade the wheel back into the room, so the rays are a glow behind the
-    // bench rather than a pattern across the text.
-    canvas.drawRect(
-      Offset.zero & size,
-      Paint()
-        ..shader = RadialGradient(
-          center: Alignment(0, (240 / size.height) * 2 - 1),
-          radius: 460 / size.shortestSide,
-          colors: const [
-            Color(0x00171023),
-            Color(0x00171023),
-            CourtColors.stageLight,
-          ],
-          stops: const [0, 0.3, 1],
-        ).createShader(Offset.zero & size),
-    );
-  }
-
-  @override
-  bool shouldRepaint(_RaysPainter old) => old.turn != turn;
 }
 
 class _Deliberating extends StatelessWidget {
@@ -334,34 +234,25 @@ class _Deliberating extends StatelessWidget {
           const SizedBox(
             width: 56,
             height: 56,
-            child: CircularProgressIndicator(
-              strokeWidth: 3,
-              color: CourtColors.yellow,
-            ),
+            child: CircularProgressIndicator(strokeWidth: 3),
           ),
           const SizedBox(height: 24),
           const Text(
             'The court is in deliberation',
             textAlign: TextAlign.center,
-            style: TextStyle(
-              fontFamily: courtDisplayFont,
-              fontWeight: FontWeight.w700,
-              fontSize: 24,
-              color: CourtColors.stageInk,
-            ),
+            style: TextStyle(fontWeight: FontWeight.w700, fontSize: 24),
           ),
           const SizedBox(height: 10),
-          const Padding(
-            padding: EdgeInsets.symmetric(horizontal: 40),
+          Padding(
+            padding: const EdgeInsets.symmetric(horizontal: 40),
             child: Text(
               'Both sides have been heard. The judge is weighing the '
               'evidence, such as it is.',
               textAlign: TextAlign.center,
               style: TextStyle(
                 fontSize: 15,
-                fontWeight: FontWeight.w600,
                 height: 1.45,
-                color: CourtColors.stageDim,
+                color: context.palette.inkDim,
               ),
             ),
           ),
@@ -392,38 +283,32 @@ class _Notice extends StatelessWidget {
       child: Column(
         mainAxisSize: MainAxisSize.min,
         children: [
-          const CourtIcon(
-            CourtGlyph.gavel,
-            size: 44,
-            color: CourtColors.yellow,
-          ),
+          CourtIcon(CourtGlyph.gavel, size: 44, color: context.palette.accent),
           const SizedBox(height: 18),
           Text(
             title,
             textAlign: TextAlign.center,
-            style: const TextStyle(
-              fontFamily: courtDisplayFont,
-              fontWeight: FontWeight.w700,
-              fontSize: 24,
-              color: CourtColors.stageInk,
-            ),
+            style: const TextStyle(fontWeight: FontWeight.w700, fontSize: 24),
           ),
           const SizedBox(height: 10),
           Text(
             message,
             textAlign: TextAlign.center,
-            style: const TextStyle(
+            style: TextStyle(
               fontSize: 15,
-              fontWeight: FontWeight.w600,
               height: 1.45,
-              color: CourtColors.stageDim,
+              color: context.palette.inkDim,
             ),
           ),
           if (actionLabel != null && onAction != null) ...[
             const SizedBox(height: 26),
             SizedBox(
               width: double.infinity,
-              child: CourtKey(label: actionLabel!, onPressed: onAction),
+              child: SueButton(
+                label: actionLabel!,
+                height: 54,
+                onPressed: onAction,
+              ),
             ),
           ],
         ],
@@ -504,467 +389,377 @@ class _VerdictViewState extends ConsumerState<_VerdictView> {
     final v = widget.verdict;
     final name = widget.accused ?? 'The accused';
     final overruled = v.verdict.overrules(widget.tally);
+    final palette = context.palette;
     // After a ruling the defendant's record has moved; show where it landed
     // rather than inventing a delta.
     final sheet = ref.watch(rapSheetProvider).valueOrNull;
     final record = sheet
         ?.where((r) => r.displayName.toLowerCase() == name.toLowerCase())
         .firstOrNull;
+    final tone = switch (v.verdict) {
+      VerdictKind.notGuilty => SueTone.teal,
+      VerdictKind.insufficientEvidence => SueTone.gray,
+      _ => SueTone.orange,
+    };
+    // 60px is the artboard's; the longer rulings step down to stay on one line.
+    final wordSize = v.verdict.label.length > 10 ? 40.0 : 60.0;
 
-    return ListView(
-      padding: const EdgeInsets.fromLTRB(16, 18, 16, 28),
-      children: [
-        const Center(
-          child: Text(
-            'THE COURT FINDS',
+    // The finding — the stage, the line and the word — and everything the
+    // court said after it. On a landscape tablet the artboard sets the two
+    // side by side; everywhere else they run one after the other.
+    final finding = <Widget>[
+      SueStage(tone: tone),
+      const SizedBox(height: 16),
+      Text(
+        'THE COURT FINDS ${name.toUpperCase()}',
+        style: TextStyle(
+          fontSize: 12,
+          fontWeight: FontWeight.w500,
+          letterSpacing: 1.5,
+          color: palette.inkDim,
+        ),
+      ),
+      const SizedBox(height: 2),
+      Wrap(
+        crossAxisAlignment: WrapCrossAlignment.center,
+        spacing: 12,
+        runSpacing: 6,
+        children: [
+          Text(
+            _title(v.verdict),
+            key: const Key('verdict-stamp'),
             style: TextStyle(
-              fontFamily: courtDisplayFont,
+              fontSize: wordSize,
               fontWeight: FontWeight.w700,
-              fontSize: 16,
-              letterSpacing: 4,
-              color: CourtColors.yellow,
+              height: 1,
+              letterSpacing: -1,
+              color: tone.fg(context),
             ),
           ),
-        ),
-        const SizedBox(height: 14),
-        Center(
-          child: Column(
-            children: [
-              Container(
-                width: 136,
-                height: 136,
-                alignment: Alignment.center,
-                decoration: BoxDecoration(
-                  shape: BoxShape.circle,
-                  color: tintFor(name),
-                  border: Border.all(color: CourtColors.stageInk, width: 5),
-                  boxShadow: const [
-                    BoxShadow(color: Colors.black, offset: Offset(0, 6)),
-                  ],
-                ),
-                child: Text(
-                  name.trim().isEmpty ? '?' : name.trim()[0].toUpperCase(),
-                  style: const TextStyle(
-                    fontFamily: courtDisplayFont,
-                    fontWeight: FontWeight.w700,
-                    fontSize: 58,
-                    height: 1,
-                    color: CourtColors.lightInk,
-                  ),
+          if (overruled)
+            Container(
+              key: const Key('overruled'),
+              padding: const EdgeInsets.symmetric(horizontal: 9, vertical: 6),
+              decoration: BoxDecoration(
+                color: SueTone.blue.tint(context),
+                borderRadius: BorderRadius.circular(8),
+              ),
+              child: Text(
+                widget.tally == null
+                    ? 'JUDGE OVERRULED\nTHE JURY'
+                    : 'JUDGE OVERRULED\nJURY SAID ${widget.tally!.guilty}–${widget.tally!.notGuilty}'
+                          ' ${widget.tally!.guilty > widget.tally!.notGuilty ? 'GUILTY' : 'NOT GUILTY'}',
+                style: TextStyle(
+                  fontSize: 10,
+                  fontWeight: FontWeight.w600,
+                  letterSpacing: 1,
+                  height: 1.3,
+                  color: SueTone.blue.fg(context),
                 ),
               ),
-              const SizedBox(height: 10),
-              Text(
-                name,
-                maxLines: 1,
-                overflow: TextOverflow.ellipsis,
-                style: const TextStyle(
-                  fontFamily: courtDisplayFont,
-                  fontWeight: FontWeight.w700,
-                  fontSize: 32,
-                  height: 1,
-                  color: CourtColors.stageInk,
+            ),
+        ],
+      ),
+    ];
+
+    final ruling = <Widget>[
+      _RulingCard(verdict: v),
+      const SizedBox(height: 12),
+      _RewardsCard(caseId: widget.caseId),
+      if (record != null) ...[
+        const SizedBox(height: 12),
+        SueCard(
+          radius: 20,
+          padding: const EdgeInsets.symmetric(horizontal: 18, vertical: 14),
+          child: Row(
+            children: [
+              Expanded(
+                child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    Text(
+                      'RAP SHEET',
+                      style: TextStyle(
+                        fontSize: 10,
+                        fontWeight: FontWeight.w500,
+                        letterSpacing: 1.2,
+                        color: palette.inkDim,
+                      ),
+                    ),
+                    const SizedBox(height: 4),
+                    Text(
+                      '${record.convictions} guilty',
+                      style: TextStyle(
+                        fontSize: 20,
+                        fontWeight: FontWeight.w700,
+                        color: SueTone.orange.fg(context),
+                      ),
+                    ),
+                  ],
                 ),
+              ),
+              SuePill(
+                record.title.toUpperCase(),
+                tone: SueTone.gold,
+                round: false,
               ),
             ],
           ),
         ),
-        const SizedBox(height: 16),
-        Center(child: VerdictStamp(verdict: v.verdict, animate: true)),
-        if (overruled) ...[
-          const SizedBox(height: 14),
-          Center(
-            child: Container(
-              padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 6),
-              decoration: BoxDecoration(
-                color: CourtColors.orange,
-                borderRadius: BorderRadius.circular(courtRadiusPill),
-                border: Border.all(color: Colors.black, width: courtBorderWidth),
+      ],
+      if (widget.tally != null && !widget.tally!.isEmpty) ...[
+        const SizedBox(height: 12),
+        SueCard(
+          radius: 20,
+          padding: const EdgeInsets.fromLTRB(18, 14, 18, 16),
+          child: Column(
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+              Text(
+                'THE JURY',
+                style: TextStyle(
+                  fontSize: 10,
+                  fontWeight: FontWeight.w500,
+                  letterSpacing: 1.2,
+                  color: palette.inkDim,
+                ),
               ),
-              child: Row(
-                mainAxisSize: MainAxisSize.min,
-                children: [
-                  const CourtIcon(
-                    CourtGlyph.warn,
-                    size: 16,
-                    color: CourtColors.lightInk,
-                    strokeWidth: 3,
+              const SizedBox(height: 10),
+              VoteBar(
+                key: const Key('jury-tally'),
+                guilty: widget.tally!.guilty,
+                notGuilty: widget.tally!.notGuilty,
+              ),
+              if (overruled) ...[
+                const SizedBox(height: 12),
+                Text(
+                  v.juryNote.isNotEmpty
+                      ? v.juryNote
+                      : 'The court thanks the jury for its time, and disagrees.',
+                  style: TextStyle(
+                    fontSize: 13,
+                    height: 1.4,
+                    color: palette.inkDim,
                   ),
-                  const SizedBox(width: 8),
-                  Flexible(
-                    child: Text(
-                      widget.tally == null
-                          ? 'JUDGE OVERRULED THE JURY'
-                          : 'JUDGE OVERRULED THE JURY · '
-                                '${widget.tally!.guilty}–${widget.tally!.notGuilty}',
-                      maxLines: 2,
-                      style: const TextStyle(
-                        fontSize: 13,
-                        fontWeight: FontWeight.w900,
-                        color: CourtColors.lightInk,
-                      ),
+                ),
+              ],
+            ],
+          ),
+        ),
+      ],
+      const SizedBox(height: 8),
+      _WorkingToggle(
+        open: _showWorking,
+        onToggle: () => setState(() => _showWorking = !_showWorking),
+      ),
+      if (_showWorking) ...[const SizedBox(height: 6), _Working(verdict: v)],
+      const SizedBox(height: 14),
+      if (_shareLink == null)
+        SueButton(
+          label: 'SHARE THE VERDICT',
+          height: 56,
+          busy: _busy,
+          onPressed: _busy ? null : _enableShare,
+        )
+      else ...[
+        SueCard(
+          radius: 20,
+          padding: const EdgeInsets.all(16),
+          child: Column(
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+              Text(
+                'PUBLIC LINK IS LIVE',
+                style: TextStyle(
+                  fontSize: 10,
+                  fontWeight: FontWeight.w600,
+                  letterSpacing: 1.2,
+                  color: SueTone.teal.fg(context),
+                ),
+              ),
+              const SizedBox(height: 10),
+              SelectableText(
+                _shareLink!.url,
+                style: const TextStyle(fontSize: 13, fontFamily: 'monospace'),
+              ),
+              const SizedBox(height: 14),
+              Row(
+                children: [
+                  Expanded(
+                    child: SueButton(
+                      label: 'COPY',
+                      height: 46,
+                      onPressed: () async {
+                        await Clipboard.setData(
+                          ClipboardData(text: _shareLink!.url),
+                        );
+                        if (!context.mounted) return;
+                        ScaffoldMessenger.of(context).showSnackBar(
+                          const SnackBar(content: Text('Link copied.')),
+                        );
+                      },
+                    ),
+                  ),
+                  const SizedBox(width: 10),
+                  Expanded(
+                    child: SueButton(
+                      label: 'REVOKE',
+                      height: 46,
+                      tone: SueTone.orange,
+                      onPressed: _busy ? null : _revokeShare,
                     ),
                   ),
                 ],
               ),
-            ),
+            ],
           ),
-        ],
-        const SizedBox(height: 16),
-        _RulingCard(verdict: v),
-        if (record != null) ...[
-          const SizedBox(height: 12),
-          IntrinsicHeight(
-            child: Row(
-              crossAxisAlignment: CrossAxisAlignment.stretch,
-              children: [
-                Expanded(
-                  child: _StageTile(
-                    label: 'RAP SHEET',
-                    value: '${record.convictions} guilty',
-                    valueColor: CourtColors.redOnStage,
-                  ),
-                ),
-                const SizedBox(width: 10),
-                Expanded(
-                  child: _StageTile(
-                    label: 'THEIR TITLE',
-                    value: record.title,
-                    valueColor: CourtColors.yellow,
-                  ),
-                ),
-              ],
-            ),
-          ),
-        ],
-        if (widget.tally != null && !widget.tally!.isEmpty) ...[
-          const SizedBox(height: 12),
-          Container(
-            padding: const EdgeInsets.all(14),
-            decoration: BoxDecoration(
-              color: CourtColors.stageChipLight,
-              borderRadius: BorderRadius.circular(18),
-            ),
-            child: Column(
-              crossAxisAlignment: CrossAxisAlignment.start,
-              children: [
-                const Text(
-                  'THE JURY',
-                  style: TextStyle(
-                    fontSize: 11,
-                    fontWeight: FontWeight.w900,
-                    letterSpacing: 1,
-                    color: CourtColors.stageDim,
-                  ),
-                ),
-                const SizedBox(height: 6),
-                Text(
-                  widget.tally!.summary,
-                  style: const TextStyle(
-                    fontSize: 14,
-                    fontWeight: FontWeight.w700,
-                    color: CourtColors.stageInk,
-                  ),
-                ),
-                const SizedBox(height: 12),
-                JuryTallyBar(tally: widget.tally!),
-                if (overruled)
-                  OverruledBanner(
-                    note: v.juryNote.isNotEmpty
-                        ? v.juryNote
-                        : 'The court thanks the jury for its time, and disagrees.',
-                  ),
-              ],
-            ),
-          ),
-        ],
+        ),
         const SizedBox(height: 12),
-        _WorkingToggle(
-          open: _showWorking,
-          onToggle: () => setState(() => _showWorking = !_showWorking),
-        ),
-        if (_showWorking) ...[
-          const SizedBox(height: 10),
-          _Working(verdict: v),
-        ],
-        const SizedBox(height: 20),
-        if (_shareLink == null)
-          CourtKey(
-            label: 'Post to the group chat',
-            glyph: CourtGlyph.share,
-            onPressed: _busy ? null : _enableShare,
-            busy: _busy,
-          )
-        else ...[
-          Container(
-            padding: const EdgeInsets.all(14),
-            decoration: BoxDecoration(
-              color: CourtColors.stageChipLight,
-              borderRadius: BorderRadius.circular(18),
-            ),
-            child: Column(
-              crossAxisAlignment: CrossAxisAlignment.start,
-              children: [
-                const Text(
-                  'PUBLIC LINK IS LIVE',
-                  style: TextStyle(
-                    fontSize: 11,
-                    fontWeight: FontWeight.w900,
-                    letterSpacing: 1,
-                    color: CourtColors.yellow,
-                  ),
-                ),
-                const SizedBox(height: 10),
-                SelectableText(
-                  _shareLink!.url,
-                  style: const TextStyle(
-                    fontSize: 13,
-                    fontFamily: 'monospace',
-                    color: CourtColors.stageInk,
-                  ),
-                ),
-                const SizedBox(height: 12),
-                Row(
-                  children: [
-                    Expanded(
-                      child: CourtKey(
-                        label: 'Copy',
-                        height: 46,
-                        fill: CourtColors.stageLight,
-                        foreground: CourtColors.stageInk,
-                        shadowInk: Colors.black,
-                        onPressed: () async {
-                          await Clipboard.setData(
-                            ClipboardData(text: _shareLink!.url),
-                          );
-                          if (!context.mounted) return;
-                          ScaffoldMessenger.of(context).showSnackBar(
-                            const SnackBar(content: Text('Link copied.')),
-                          );
-                        },
-                      ),
-                    ),
-                    const SizedBox(width: 10),
-                    Expanded(
-                      child: CourtKey(
-                        label: 'Revoke',
-                        height: 46,
-                        fill: CourtColors.stageLight,
-                        foreground: CourtColors.redOnStage,
-                        shadowInk: Colors.black,
-                        onPressed: _busy ? null : _revokeShare,
-                      ),
-                    ),
-                  ],
-                ),
-              ],
-            ),
+        SueButton(
+          label: 'SHARE AGAIN',
+          height: 56,
+          onPressed: () => SharePlus.instance.share(
+            ShareParams(text: '${v.shareCaption} ${_shareLink!.url}'),
           ),
-          const SizedBox(height: 12),
-          CourtKey(
-            label: 'Share again',
-            glyph: CourtGlyph.share,
-            onPressed: () => SharePlus.instance.share(
-              ShareParams(text: '${v.shareCaption} ${_shareLink!.url}'),
-            ),
-          ),
-        ],
-        const SizedBox(height: 10),
-        CourtKey(
-          label: 'See the rap sheet',
-          height: 50,
-          fill: Colors.transparent,
-          foreground: CourtColors.stageInk,
-          shadowInk: Colors.transparent,
-          onPressed: () => context.go('/rap-sheet'),
-        ),
-        const CourtDisclaimer(
-          text:
-              'Publishing is opt-in and reversible. The public page shows only '
-              'the verdict — never the raw accusation or defense.',
         ),
       ],
+      const SizedBox(height: 6),
+      Semantics(
+        button: true,
+        child: InkWell(
+          borderRadius: BorderRadius.circular(14),
+          onTap: () => context.go('/rap-sheet'),
+          child: SizedBox(
+            height: 44,
+            child: Center(
+              child: Text(
+                'See the rap sheet',
+                style: TextStyle(
+                  fontSize: 14,
+                  fontWeight: FontWeight.w500,
+                  color: palette.accent,
+                ),
+              ),
+            ),
+          ),
+        ),
+      ),
+      const CourtDisclaimer(
+        text:
+            'Publishing is opt-in and reversible. The public page shows only '
+            'the verdict — never the raw accusation or defense.',
+      ),
+    ];
+
+    Widget stack(List<Widget> items) => Column(
+      crossAxisAlignment: CrossAxisAlignment.start,
+      mainAxisSize: MainAxisSize.min,
+      children: items,
     );
+
+    if (context.isWideTablet) {
+      return ListView(
+        padding: EdgeInsets.zero,
+        children: [
+          SueColumns(start: [stack(finding)], end: [stack(ruling)]),
+        ],
+      );
+    }
+
+    return ListView(
+      padding: context.isTablet
+          ? EdgeInsets.zero
+          : const EdgeInsets.fromLTRB(20, 6, 20, 28),
+      children: [stack(finding), const SizedBox(height: 12), stack(ruling)],
+    );
+  }
+
+  /// "Guilty", "Not guilty": the artboard sets the word in sentence case.
+  static String _title(VerdictKind k) {
+    final l = k.label.toLowerCase();
+    return l[0].toUpperCase() + l.substring(1);
   }
 }
 
-/// The judge's own words, on cream so they read as the document they are.
+/// The judge's own words, then the sentence.
 class _RulingCard extends StatelessWidget {
   const _RulingCard({required this.verdict});
 
   final Verdict verdict;
 
   @override
-  Widget build(BuildContext context) => Container(
-    decoration: BoxDecoration(
-      color: CourtColors.lightBg,
-      borderRadius: BorderRadius.circular(courtRadiusLg),
-      border: Border.all(color: Colors.black, width: courtBorderWidth),
-      boxShadow: const [BoxShadow(color: Colors.black, offset: Offset(0, 5))],
-    ),
-    padding: const EdgeInsets.fromLTRB(16, 14, 16, 14),
-    child: Column(
-      crossAxisAlignment: CrossAxisAlignment.start,
-      children: [
-        Row(
+  Widget build(BuildContext context) {
+    final palette = context.palette;
+    return SizedBox(
+      width: double.infinity,
+      child: SueCard(
+        radius: 20,
+        padding: const EdgeInsets.symmetric(horizontal: 18, vertical: 16),
+        child: Column(
+          crossAxisAlignment: CrossAxisAlignment.start,
           children: [
-            Container(
-              width: 40,
-              height: 40,
-              alignment: Alignment.center,
-              decoration: BoxDecoration(
-                color: CourtColors.yellow,
-                borderRadius: BorderRadius.circular(12),
-                border: Border.all(
-                  color: CourtColors.lightInk,
-                  width: courtBorderWidth,
-                ),
-              ),
-              child: const CourtIcon(
-                CourtGlyph.gavel,
-                size: 20,
-                color: CourtColors.lightInk,
+            Text(
+              'JUDGE BYTE RULES',
+              style: TextStyle(
+                fontSize: 10,
+                fontWeight: FontWeight.w500,
+                letterSpacing: 1.2,
+                color: palette.inkDim,
               ),
             ),
-            const SizedBox(width: 10),
-            const Expanded(
-              child: Text(
-                'The Honourable Judge Byte',
-                maxLines: 1,
-                overflow: TextOverflow.ellipsis,
-                style: TextStyle(
-                  fontFamily: courtDisplayFont,
-                  fontWeight: FontWeight.w700,
-                  fontSize: 17,
-                  color: CourtColors.lightInk,
+            if (verdict.charge.isNotEmpty) ...[
+              const SizedBox(height: 8),
+              Text(
+                verdict.charge,
+                style: TextStyle(fontSize: 13, color: palette.inkDim),
+              ),
+            ],
+            const SizedBox(height: 10),
+            Text(
+              '“${verdict.judgeRoast.isEmpty ? verdict.reasoning : verdict.judgeRoast}”',
+              style: const TextStyle(fontSize: 15, height: 1.4),
+            ),
+            if (verdict.sentence.isNotEmpty) ...[
+              const SizedBox(height: 10),
+              Container(
+                padding: const EdgeInsets.only(top: 10),
+                decoration: BoxDecoration(
+                  border: Border(top: BorderSide(color: palette.surfaceAlt)),
+                ),
+                child: Row(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    const SuePill('SENTENCE', round: false),
+                    const SizedBox(width: 10),
+                    Expanded(
+                      child: Text(
+                        verdict.sentence,
+                        style: const TextStyle(
+                          fontSize: 14,
+                          fontWeight: FontWeight.w500,
+                          height: 1.35,
+                        ),
+                      ),
+                    ),
+                  ],
                 ),
               ),
-            ),
+            ],
+            if (verdict.closingLine.isNotEmpty) ...[
+              const SizedBox(height: 12),
+              Center(
+                child: Text(
+                  verdict.closingLine,
+                  textAlign: TextAlign.center,
+                  style: TextStyle(fontSize: 14, color: palette.inkDim),
+                ),
+              ),
+            ],
           ],
         ),
-        if (verdict.charge.isNotEmpty) ...[
-          const SizedBox(height: 8),
-          Text(
-            verdict.charge,
-            style: const TextStyle(
-              fontSize: 13,
-              fontWeight: FontWeight.w800,
-              color: CourtColors.lightInkDim,
-            ),
-          ),
-        ],
-        const SizedBox(height: 8),
-        Text(
-          '“${verdict.judgeRoast.isEmpty ? verdict.reasoning : verdict.judgeRoast}”',
-          style: const TextStyle(
-            fontSize: 16,
-            fontWeight: FontWeight.w700,
-            height: 1.4,
-            color: CourtColors.lightInk,
-          ),
-        ),
-        if (verdict.sentence.isNotEmpty) ...[
-          const SizedBox(height: 10),
-          Container(
-            width: double.infinity,
-            padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 8),
-            decoration: BoxDecoration(
-              color: CourtColors.lightTray2,
-              borderRadius: BorderRadius.circular(courtRadiusSm),
-            ),
-            child: Column(
-              crossAxisAlignment: CrossAxisAlignment.start,
-              children: [
-                const Text(
-                  'SENTENCE',
-                  style: TextStyle(
-                    fontSize: 11,
-                    fontWeight: FontWeight.w900,
-                    letterSpacing: 1.5,
-                    color: CourtColors.redText,
-                  ),
-                ),
-                const SizedBox(height: 2),
-                Text(
-                  verdict.sentence,
-                  style: const TextStyle(
-                    fontSize: 14,
-                    fontWeight: FontWeight.w800,
-                    height: 1.35,
-                    color: CourtColors.lightInk,
-                  ),
-                ),
-              ],
-            ),
-          ),
-        ],
-        if (verdict.closingLine.isNotEmpty) ...[
-          const SizedBox(height: 10),
-          Center(
-            child: Text(
-              verdict.closingLine,
-              textAlign: TextAlign.center,
-              style: const TextStyle(
-                fontFamily: courtDisplayFont,
-                fontWeight: FontWeight.w600,
-                fontSize: 15,
-                color: CourtColors.lightInkDim,
-              ),
-            ),
-          ),
-        ],
-      ],
-    ),
-  );
-}
-
-class _StageTile extends StatelessWidget {
-  const _StageTile({
-    required this.label,
-    required this.value,
-    required this.valueColor,
-  });
-
-  final String label;
-  final String value;
-  final Color valueColor;
-
-  @override
-  Widget build(BuildContext context) => Container(
-    padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 10),
-    decoration: BoxDecoration(
-      color: CourtColors.stageChipLight,
-      borderRadius: BorderRadius.circular(18),
-    ),
-    child: Column(
-      crossAxisAlignment: CrossAxisAlignment.start,
-      mainAxisSize: MainAxisSize.min,
-      children: [
-        Text(
-          label,
-          style: const TextStyle(
-            fontSize: 11,
-            fontWeight: FontWeight.w900,
-            letterSpacing: 1,
-            color: CourtColors.stageDim,
-          ),
-        ),
-        const SizedBox(height: 2),
-        Text(
-          value,
-          maxLines: 2,
-          overflow: TextOverflow.ellipsis,
-          style: TextStyle(
-            fontFamily: courtDisplayFont,
-            fontWeight: FontWeight.w700,
-            fontSize: 19,
-            height: 1.1,
-            color: valueColor,
-          ),
-        ),
-      ],
-    ),
-  );
+      ),
+    );
+  }
 }
 
 class _WorkingToggle extends StatelessWidget {
@@ -978,7 +773,7 @@ class _WorkingToggle extends StatelessWidget {
     button: true,
     expanded: open,
     child: InkWell(
-      borderRadius: BorderRadius.circular(courtRadiusPill),
+      borderRadius: BorderRadius.circular(14),
       onTap: onToggle,
       child: Padding(
         padding: const EdgeInsets.symmetric(vertical: 10, horizontal: 6),
@@ -987,18 +782,18 @@ class _WorkingToggle extends StatelessWidget {
             Expanded(
               child: Text(
                 open ? 'Hide the working' : 'How the court got there',
-                style: const TextStyle(
-                  fontWeight: FontWeight.w900,
+                style: TextStyle(
+                  fontWeight: FontWeight.w600,
                   fontSize: 14,
-                  color: CourtColors.stageDim,
+                  color: context.palette.inkDim,
                 ),
               ),
             ),
             CourtIcon(
               open ? CourtGlyph.chevronDown : CourtGlyph.chevronRight,
               size: 18,
-              color: CourtColors.stageDim,
-              strokeWidth: 3,
+              color: context.palette.inkDim,
+              strokeWidth: 2.6,
             ),
           ],
         ),
@@ -1013,19 +808,19 @@ class _Working extends StatelessWidget {
   final Verdict verdict;
 
   @override
-  Widget build(BuildContext context) => Container(
-    padding: const EdgeInsets.all(14),
-    decoration: BoxDecoration(
-      color: CourtColors.stageChipLight,
-      borderRadius: BorderRadius.circular(18),
-    ),
-    child: Column(
-      crossAxisAlignment: CrossAxisAlignment.start,
-      children: [
-        _Section(label: 'PROSECUTION', body: verdict.prosecutionSummary),
-        _Section(label: 'DEFENSE', body: verdict.defenseSummary),
-        _Section(label: 'REASONING', body: verdict.reasoning, last: true),
-      ],
+  Widget build(BuildContext context) => SueCard(
+    radius: 20,
+    padding: const EdgeInsets.all(16),
+    child: SizedBox(
+      width: double.infinity,
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          _Section(label: 'PROSECUTION', body: verdict.prosecutionSummary),
+          _Section(label: 'DEFENSE', body: verdict.defenseSummary),
+          _Section(label: 'REASONING', body: verdict.reasoning, last: true),
+        ],
+      ),
     ),
   );
 }
@@ -1045,24 +840,161 @@ class _Section extends StatelessWidget {
       children: [
         Text(
           label,
-          style: const TextStyle(
-            fontSize: 11,
-            fontWeight: FontWeight.w900,
-            letterSpacing: 1,
-            color: CourtColors.stageDim,
+          style: TextStyle(
+            fontSize: 10,
+            fontWeight: FontWeight.w500,
+            letterSpacing: 1.2,
+            color: context.palette.inkDim,
           ),
         ),
         const SizedBox(height: 4),
-        Text(
-          body,
-          style: const TextStyle(
-            fontSize: 15,
-            fontWeight: FontWeight.w600,
-            height: 1.45,
-            color: CourtColors.stageInk,
-          ),
-        ),
+        Text(body, style: const TextStyle(fontSize: 15, height: 1.45)),
       ],
     ),
   );
+}
+
+/// "YOUR REWARDS": what this ruling paid you.
+///
+/// Drawn only when the case actually paid this player something. A case you
+/// were not part of, or one the judge has not ruled on, has no rows — and an
+/// empty rewards card would be a lie dressed as a reward.
+class _RewardsCard extends ConsumerWidget {
+  const _RewardsCard({required this.caseId});
+
+  final String caseId;
+
+  @override
+  Widget build(BuildContext context, WidgetRef ref) {
+    final rewards = ref.watch(caseRewardsProvider(caseId)).valueOrNull;
+    if (rewards == null || rewards.isEmpty) return const SizedBox.shrink();
+
+    final palette = context.palette;
+    final badges = rewards.items.where((r) => r.badgeCode != null).toList();
+    final lines = rewards.items.where((r) => r.xp != 0).toList();
+
+    return SueCard(
+      radius: 20,
+      padding: const EdgeInsets.fromLTRB(16, 14, 16, 14),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.stretch,
+        children: [
+          Row(
+            children: [
+              Expanded(
+                child: Text(
+                  'YOUR REWARDS',
+                  style: TextStyle(
+                    fontSize: 10,
+                    fontWeight: FontWeight.w500,
+                    letterSpacing: 1.2,
+                    color: palette.inkDim,
+                  ),
+                ),
+              ),
+              if (rewards.levelReached != null)
+                Container(
+                  key: const Key('level-up'),
+                  padding: const EdgeInsets.symmetric(
+                    horizontal: 8,
+                    vertical: 4,
+                  ),
+                  decoration: BoxDecoration(
+                    color: CourtColors.gold,
+                    borderRadius: BorderRadius.circular(8),
+                  ),
+                  child: Text(
+                    'LEVEL UP · LV ${rewards.levelReached}',
+                    style: const TextStyle(
+                      fontSize: 10,
+                      fontWeight: FontWeight.w800,
+                      letterSpacing: 1,
+                      color: CourtColors.lightInk,
+                    ),
+                  ),
+                ),
+            ],
+          ),
+          for (final line in lines) ...[
+            const SizedBox(height: 8),
+            Row(
+              children: [
+                Expanded(
+                  child: Text(
+                    line.detail,
+                    style: const TextStyle(fontSize: 14),
+                  ),
+                ),
+                const SizedBox(width: 10),
+                Text(
+                  '+${line.xp} XP',
+                  style: TextStyle(
+                    fontSize: 14,
+                    fontWeight: FontWeight.w700,
+                    color: palette.accent,
+                  ),
+                ),
+              ],
+            ),
+          ],
+          for (final badge in badges) ...[
+            const SizedBox(height: 12),
+            Container(
+              padding: const EdgeInsets.only(top: 10),
+              decoration: BoxDecoration(
+                border: Border(top: BorderSide(color: palette.lineSoft)),
+              ),
+              child: Row(
+                children: [
+                  HexBadge(
+                    // The badge's own initial: Outfit has no star, and a
+                    // missing glyph draws as an empty box.
+                    glyph: (badge.badgeName ?? badge.detail).isEmpty
+                        ? '?'
+                        : (badge.badgeName ?? badge.detail)[0].toUpperCase(),
+                    label: '',
+                    earned: true,
+                    tone: SueTone.orange,
+                    width: 30,
+                  ),
+                  const SizedBox(width: 10),
+                  Expanded(
+                    child: Text.rich(
+                      TextSpan(
+                        children: [
+                          const TextSpan(
+                            text: 'Badge unlocked: ',
+                            style: TextStyle(fontWeight: FontWeight.w700),
+                          ),
+                          TextSpan(text: badge.badgeName ?? badge.detail),
+                        ],
+                      ),
+                      style: const TextStyle(fontSize: 14),
+                    ),
+                  ),
+                  if (badge.coins > 0) ...[
+                    const SizedBox(width: 8),
+                    Row(
+                      mainAxisSize: MainAxisSize.min,
+                      children: [
+                        const SueCoin(size: 16),
+                        const SizedBox(width: 4),
+                        Text(
+                          '+${badge.coins}',
+                          style: const TextStyle(
+                            fontSize: 14,
+                            fontWeight: FontWeight.w700,
+                          ),
+                        ),
+                      ],
+                    ),
+                  ],
+                ],
+              ),
+            ),
+          ],
+        ],
+      ),
+    );
+  }
 }

@@ -30,6 +30,12 @@ class JuryVote(Base):
     # are: a database dump should not identify who voted which way.
     voter_key: Mapped[str] = mapped_column(String(64))
     juror_name: Mapped[str | None] = mapped_column(String(40), nullable=True)
+    # Set when the ballot arrived with a bearer token. The jury link stays a
+    # capability anyone can hold — this only says who to pay if they were
+    # signed in, and stays null for everyone else.
+    juror_user_id: Mapped[uuid.UUID | None] = mapped_column(
+        UUIDColumn, ForeignKey("users.id", ondelete="SET NULL"), nullable=True, index=True
+    )
     vote: Mapped[str] = mapped_column(String(16))
     created_at: Mapped[datetime] = created_at_column()
 

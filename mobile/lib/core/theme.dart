@@ -1,116 +1,118 @@
 import 'package:flutter/material.dart';
 
-/// The playful-game theme, matched one-for-one to the "Sue Me — App Screens"
-/// design canvas: a warm cream page, white cards with a 3px ink border and a
-/// hard offset shadow (no blur), fat radii, and a dark "stage" panel that
-/// carries the one loud statistic on each screen.
+/// The "Sue Me — App Screens" design canvas, matched to its artboards: a cool
+/// grey page, white cards lifted by a soft blue-grey shadow (no borders), blue
+/// as the action colour, orange for guilty and teal for not guilty, Outfit
+/// throughout.
 ///
-/// Every value below is a colour taken literally from an artboard. Where the
-/// design names a token twice (light / dark) it lives on [CourtPalette]; where
-/// it is the same in both modes it is a `static const` here.
+/// Names from the earlier theme are kept (`violet`, `red`, `greenFill`, ...) so
+/// call sites did not have to move; the *values* are the canvas's. `violet` is
+/// now the canvas blue.
 class CourtColors {
   const CourtColors._();
 
-  // Brand. The action colour, and the darker shade that sits under it as the
-  // hard shadow so a button looks like a physical key. Unchanged in dark mode:
-  // the design uses the same violet on both.
-  static const violet = Color(0xFF7A3BF0);
-  static const violetHover = Color(0xFF6A2CE0);
-  static const violetInk = Color(0xFF4A17B0);
+  // Brand / action: canvas blue `#2F5BD8` and the darker shade under it.
+  static const violet = Color(0xFF2F5BD8);
+  static const violetHover = Color(0xFF2449B5);
+  static const violetInk = Color(0xFF1B3A94);
+  static const blueDark = Color(0xFF6C8EF0);
 
-  // Semantic fills
-  static const blue = Color(0xFF2E6BFF);
-  static const blueDeep = Color(0xFF1B4ACB);
-  static const blueSoft = Color(0xFF3D8CF0);
+  static const blue = Color(0xFF2F5BD8);
+  static const blueDeep = Color(0xFF2449B5);
+  static const blueSoft = Color(0xFF5FD8E8);
   static const onBlue = Color(0xFFFFFFFF);
 
-  static const greenFill = Color(0xFF35D07F);
-  static const greenDeep = Color(0xFF0E8A52);
-  static const onGreen = Color(0xFF0B3B22);
-  static const presence = Color(0xFF35D07F);
+  // Teal = not guilty / success. Orange = guilty / urgency.
+  static const greenFill = Color(0xFF1E9E97);
+  static const greenDeep = Color(0xFF1A8C86);
+  static const onGreen = Color(0xFFFFFFFF);
+  static const presence = Color(0xFF1E9E97);
 
-  static const red = Color(0xFFFF3B52);
-  static const redDeep = Color(0xFFC70F31);
-  static const redText = Color(0xFFB3122A);
-  static const redInk = Color(0xFFD61F37);
-  /// The red that is legible on the dark stage, where [red] is too dense.
-  static const redOnStage = Color(0xFFFF6B7D);
-  static const orange = Color(0xFFFF8A3D);
-  static const orangeDeep = Color(0xFFC2521A);
-  static const onOrange = Color(0xFF3A1500);
-  static const yellow = Color(0xFFFFC93C);
-  static const yellowDeep = Color(0xFFA87400);
-  static const pink = Color(0xFFFF5CA8);
+  static const red = Color(0xFFE2552D);
+  static const redDeep = Color(0xFFC2431E);
+  static const redText = Color(0xFFE2552D);
+  static const redInk = Color(0xFFD9502A);
+  static const redOnStage = Color(0xFFFF7A54);
+  static const orange = Color(0xFFE2552D);
+  static const orangeDeep = Color(0xFFC2431E);
+  static const onOrange = Color(0xFFFFFFFF);
+  static const yellow = Color(0xFFF5B82E);
+  static const yellowDeep = Color(0xFFD99A12);
+  static const pink = Color(0xFFB44FA8);
+  static const gold = Color(0xFFF5B82E);
+  static const goldDeep = Color(0xFFD99A12);
 
-  // Verdicts. `notGuilty` is the text-safe green; `greenFill` is for fills.
   static const guilty = red;
-  static const notGuilty = greenDeep;
+  static const notGuilty = Color(0xFF1E9E97);
   static const bothGuilty = orange;
-  static const insufficient = Color(0xFF8B7C99);
+  static const insufficient = Color(0xFF8A90A6);
 
-  // The stage: a near-black plum panel that the design drops onto both the
-  // light and the dark page. Its own text colours never change with the mode,
-  // because the panel never changes with the mode.
-  static const stageLight = Color(0xFF171023);
-  static const stageDark = Color(0xFF0B0713);
-  static const stageInk = Color(0xFFFFF7EC);
-  static const stageDim = Color(0xFFBCAACD);
-  static const stageChipLight = Color(0xFF2A1F3A);
-  static const stageChipDark = Color(0xFF221833);
+  // The "stage": the one dark panel that carries a loud number.
+  static const stageLight = Color(0xFF1E2235);
+  static const stageDark = Color(0xFF0A0D15);
+  static const stageInk = Color(0xFFFFFFFF);
+  static const stageDim = Color(0xFFB9BECE);
+  static const stageChipLight = Color(0xFF2B3050);
+  static const stageChipDark = Color(0xFF191D29);
 
-  // Light surfaces: warm paper, and ink that is both the text and the border.
-  static const lightBg = Color(0xFFFFF7EC);
+  // Light surfaces.
+  static const lightBg = Color(0xFFF3F5FA);
   static const lightSurface = Color(0xFFFFFFFF);
-  static const lightTray = Color(0xFFFFEEDA);
-  static const lightTray2 = Color(0xFFFFE0BD);
-  static const lightLine = Color(0xFF171023);
-  static const lineSoft = Color(0xFFEADBC8);
-  // Pastel hero wash used on the welcome screen.
-  static const heroPink = Color(0xFFFF7ED8);
-  static const heroViolet = Color(0xFFA78BFA);
-  static const heroBlue = Color(0xFF8EB8FF);
+  static const lightTray = Color(0xFFEEF1F7);
+  static const lightTray2 = Color(0xFFE6E9F1);
+  static const lightLine = Color(0xFFE6E9F1);
+  static const lineSoft = Color(0xFFEEF1F7);
+  static const heroPink = Color(0xFFB44FA8);
+  static const heroViolet = Color(0xFF5B7CFA);
+  static const heroBlue = Color(0xFF5B7CFA);
 
-  static const lightInk = Color(0xFF171023);
-  static const lightInkDim = Color(0xFF5A4A68);
-  static const lightInkFaint = Color(0xFF8E7FA0);
-  static const lightMistrial = Color(0xFFC9BBD6);
+  static const lightInk = Color(0xFF1E2235);
+  static const lightInkDim = Color(0xFF8A90A6);
+  static const lightInkFaint = Color(0xFFB9BECE);
+  static const lightMistrial = Color(0xFFB9BECE);
 
-  // Dark variant, exactly as the canvas draws it: ink-plum surfaces over a
-  // near-black page, with a **black** border. The design keeps the hard
-  // shadow in dark mode too — it reads as a crisp edge rather than a glow.
-  static const darkBg = Color(0xFF140E1F);
-  static const darkSurface = Color(0xFF221833);
-  static const darkTray = Color(0xFF2E2142);
-  static const darkTray2 = Color(0xFF3A2C4F);
-  static const darkLine = Color(0xFF000000);
-  static const darkInk = Color(0xFFFFF7EC);
-  static const darkInkDim = Color(0xFFBCAACD);
-  static const darkInkFaint = Color(0xFF8E7FA0);
-  static const darkGreenText = Color(0xFF35D07F);
-  static const darkMistrial = Color(0xFF6E5C82);
+  // Dark.
+  static const darkBg = Color(0xFF0F121B);
+  static const darkSurface = Color(0xFF191D29);
+  static const darkTray = Color(0xFF262B3A);
+  static const darkTray2 = Color(0xFF2E3446);
+  static const darkLine = Color(0xFF262B3A);
+  static const darkInk = Color(0xFFEEF0F7);
+  static const darkInkDim = Color(0xFF8A90A6);
+  static const darkInkFaint = Color(0xFF4A5068);
+  static const darkGreenText = Color(0xFF3CCFC6);
+  static const darkMistrial = Color(0xFF4A5068);
 
-  // Vote buttons on a card (design: Dashboard "jury duty").
-  static const guiltyBgLight = Color(0xFFFFE1E5);
-  static const guiltyFgLight = Color(0xFFB3122A);
-  static const innocentBgLight = Color(0xFFD9F5E6);
-  static const innocentFgLight = Color(0xFF0A6B3F);
-  static const guiltyBgDark = Color(0xFF3A1620);
-  static const guiltyFgDark = Color(0xFFFF8796);
-  static const innocentBgDark = Color(0xFF123524);
-  static const innocentFgDark = Color(0xFF5BE39B);
+  // Tints (accent at ~10% on light, rgba on dark).
+  static const blueTintLight = Color(0xFFE8EEFC);
+  static const orangeTintLight = Color(0xFFFDEDE7);
+  static const tealTintLight = Color(0xFFE2F6F4);
+  static const goldTintLight = Color(0xFFFFF4D6);
+  static const blueTintDark = Color(0x382F5BD8);
+  static const orangeTintDark = Color(0x2EF0643C);
+  static const tealTintDark = Color(0x2E2BB8B0);
+  static const goldTintDark = Color(0x2EF5B82E);
 
-  /// The defence speech bubble.
-  static const bubblePinkLight = Color(0xFFFFE0EF);
-  static const bubblePinkDark = Color(0xFF3B1D35);
+  // Vote buttons on a card.
+  static const guiltyBgLight = orangeTintLight;
+  static const guiltyFgLight = Color(0xFFE2552D);
+  static const innocentBgLight = tealTintLight;
+  static const innocentFgLight = Color(0xFF1A8C86);
+  static const guiltyBgDark = orangeTintDark;
+  static const guiltyFgDark = Color(0xFFFF7A54);
+  static const innocentBgDark = tealTintDark;
+  static const innocentFgDark = Color(0xFF3CCFC6);
 
-  // Squircle tile tints, picked per person so a face keeps its colour. These
-  // are the five avatar fills the canvas uses.
+  static const bubblePinkLight = orangeTintLight;
+  static const bubblePinkDark = orangeTintDark;
+
+  /// Avatar tints, cycled per person. Order: orange, blue, teal, gold, magenta.
   static const tints = <Color>[
-    Color(0xFFFFC93C), // yellow
-    Color(0xFFFF5CA8), // pink
-    Color(0xFFFF8A3D), // orange
-    Color(0xFF35D07F), // green
-    Color(0xFF2E6BFF), // blue
+    Color(0xFFE2552D),
+    Color(0xFF2F5BD8),
+    Color(0xFF1E9E97),
+    Color(0xFFC98A0A),
+    Color(0xFFB44FA8),
   ];
   static const onTint = lightInk;
 }
@@ -269,11 +271,9 @@ extension CourtTheme on BuildContext {
   bool get isDark => Theme.of(this).brightness == Brightness.dark;
 }
 
-/// Two typefaces, bundled in pubspec.yaml and never fetched at runtime.
-/// Fredoka is display-only: it has no italic, stops at 700, and is too soft
-/// to read at 14–16px. Nunito carries body text and rhymes with it.
-const courtDisplayFont = 'Fredoka';
-const courtBodyFont = 'Nunito';
+/// One typeface, bundled in pubspec.yaml and never fetched at runtime.
+const courtDisplayFont = 'Outfit';
+const courtBodyFont = 'Outfit';
 const _font = courtBodyFont;
 
 /// Geometry, straight off the canvas.
@@ -282,37 +282,50 @@ const courtRadius = 20.0;
 const courtRadiusLg = 24.0;
 const courtRadiusXl = 28.0;
 const courtRadiusPill = 999.0;
-const courtBorderThin = 2.0;
-const courtBorderWidth = 3.0;
-const courtShadowOffset = 4.0;
-const courtShadowOffsetLg = 6.0;
+// The canvas has no borders: surfaces are lifted by shadow alone. The widths
+// stay so call sites compile and the border colour is transparent. They are
+// not 0: a zero width is a hairline, which Flutter refuses to draw on a
+// rounded box. A screen that wants a real outline (a selected option) passes
+// its own width.
+const courtBorderThin = 0.01;
+const courtBorderWidth = 0.01;
+const courtShadowOffset = 10.0;
+const courtShadowOffsetLg = 14.0;
 
 /// Height of the floating nav pill, and the gap a scrolling body must leave
 /// under itself so nothing ever ends up behind it.
-const courtNavHeight = 70.0;
-const courtNavBottomInset = 110.0;
+const courtNavHeight = 84.0;
+const courtNavBottomInset = 104.0;
 
-/// The hard shadow: a solid offset with **zero blur**. Together with the 3px
-/// border this is what makes a surface look like a physical, pressable tile
-/// rather than a floating panel.
+/// The canvas's soft lift: `0 10px 30px rgba(46,72,140,.08)` on light, a
+/// heavier black one on dark. `dy` > 10 gives the larger variant; `dy` < 10
+/// the small `0 4px 14px` row shadow. `ink` overrides the colour (e.g. the
+/// blue glow under a primary button).
 List<BoxShadow> courtHardShadow(
   BuildContext context, {
   Color? ink,
   double dy = courtShadowOffset,
-}) => [
-  BoxShadow(
-    color: ink ?? context.palette.shadowInk,
-    offset: Offset(0, dy),
-    blurRadius: 0,
-    spreadRadius: 0,
-  ),
-];
+}) {
+  final dark = context.isDark;
+  final small = dy <= 6;
+  return [
+    BoxShadow(
+      color:
+          ink ??
+          (dark
+              ? Color.fromRGBO(0, 0, 0, small ? .25 : .35)
+              : Color.fromRGBO(46, 72, 140, small ? .06 : .08)),
+      offset: Offset(0, small ? 4 : 10),
+      blurRadius: small ? 14 : 30,
+    ),
+  ];
+}
 
 /// Kept so existing call sites compile while they are migrated one by one.
 @Deprecated('Use courtHardShadow')
 List<BoxShadow> courtShadow(BuildContext context) => courtHardShadow(context);
 
-/// The whole look in one call: fill, 3px ink border, hard offset shadow.
+/// The whole look in one call: fill, soft shadow, no border.
 /// Every raised surface should use this rather than rolling its own.
 BoxDecoration courtChunk(
   BuildContext context, {
@@ -362,10 +375,10 @@ ThemeData _base(ColorScheme scheme, CourtPalette palette) {
       headlineSmall: display(text.headlineSmall, 1.1, -0.2),
       titleLarge: display(text.titleLarge, 1.1, -0.1),
       titleMedium: text.titleMedium?.copyWith(
-        fontWeight: FontWeight.w800,
+        fontWeight: FontWeight.w600,
         letterSpacing: -0.1,
       ),
-      titleSmall: text.titleSmall?.copyWith(fontWeight: FontWeight.w800),
+      titleSmall: text.titleSmall?.copyWith(fontWeight: FontWeight.w600),
       // Section labels: quiet grey, not a shout.
       labelSmall: text.labelSmall?.copyWith(
         fontSize: 12,
@@ -373,9 +386,18 @@ ThemeData _base(ColorScheme scheme, CourtPalette palette) {
         fontWeight: FontWeight.w800,
         color: palette.inkDim,
       ),
-      bodySmall: text.bodySmall?.copyWith(height: 1.4, fontWeight: FontWeight.w600),
-      bodyMedium: text.bodyMedium?.copyWith(height: 1.45, fontWeight: FontWeight.w600),
-      bodyLarge: text.bodyLarge?.copyWith(height: 1.45, fontWeight: FontWeight.w600),
+      bodySmall: text.bodySmall?.copyWith(
+        height: 1.4,
+        fontWeight: FontWeight.w500,
+      ),
+      bodyMedium: text.bodyMedium?.copyWith(
+        height: 1.45,
+        fontWeight: FontWeight.w500,
+      ),
+      bodyLarge: text.bodyLarge?.copyWith(
+        height: 1.45,
+        fontWeight: FontWeight.w500,
+      ),
     ),
     appBarTheme: AppBarTheme(
       backgroundColor: Colors.transparent,
@@ -442,7 +464,10 @@ ThemeData _base(ColorScheme scheme, CourtPalette palette) {
         borderRadius: BorderRadius.circular(courtRadius),
         borderSide: const BorderSide(color: CourtColors.red, width: 2),
       ),
-      hintStyle: TextStyle(color: palette.inkFaint, fontWeight: FontWeight.w600),
+      hintStyle: TextStyle(
+        color: palette.inkFaint,
+        fontWeight: FontWeight.w600,
+      ),
       labelStyle: TextStyle(color: palette.inkDim, fontWeight: FontWeight.w800),
     ),
     filledButtonTheme: FilledButtonThemeData(
@@ -450,13 +475,13 @@ ThemeData _base(ColorScheme scheme, CourtPalette palette) {
         backgroundColor: palette.accent,
         foregroundColor: scheme.onPrimary,
         // 58: the canvas's primary key, comfortably past the 48dp target.
-        minimumSize: const Size.fromHeight(58),
+        minimumSize: const Size.fromHeight(54),
         textStyle: const TextStyle(
           fontFamily: courtDisplayFont,
           fontSize: 19,
           fontWeight: FontWeight.w700,
         ),
-        shape: const StadiumBorder(),
+        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(16)),
         elevation: 0,
       ),
     ),
@@ -477,7 +502,10 @@ ThemeData _base(ColorScheme scheme, CourtPalette palette) {
     textButtonTheme: TextButtonThemeData(
       style: TextButton.styleFrom(
         foregroundColor: palette.accent,
-        textStyle: const TextStyle(fontWeight: FontWeight.w800),
+        textStyle: const TextStyle(
+          fontFamily: courtBodyFont,
+          fontWeight: FontWeight.w600,
+        ),
         shape: pill,
       ),
     ),
@@ -534,12 +562,12 @@ ThemeData courtLightTheme() => _base(
     inkFaint: CourtColors.lightInkFaint,
     successText: CourtColors.notGuilty,
     accentInk: CourtColors.violetInk,
-    border: CourtColors.lightInk,
-    shadowInk: CourtColors.lightInk,
+    border: Colors.transparent,
+    shadowInk: Color(0x142E488C),
     lineSoft: CourtColors.lineSoft,
     stage: CourtColors.stageLight,
     stageChip: CourtColors.stageChipLight,
-    nav: CourtColors.stageLight,
+    nav: CourtColors.lightSurface,
     mistrial: CourtColors.lightMistrial,
     bubble: CourtColors.bubblePinkLight,
     guiltyBg: CourtColors.guiltyBgLight,
@@ -551,8 +579,8 @@ ThemeData courtLightTheme() => _base(
 
 ThemeData courtDarkTheme() => _base(
   const ColorScheme.dark(
-    primary: CourtColors.violet,
-    onPrimary: Colors.white,
+    primary: CourtColors.blueDark,
+    onPrimary: Color(0xFF0F121B),
     secondary: CourtColors.greenFill,
     onSecondary: CourtColors.onGreen,
     tertiary: CourtColors.orange,
@@ -562,7 +590,7 @@ ThemeData courtDarkTheme() => _base(
     error: CourtColors.red,
   ),
   const CourtPalette(
-    accent: CourtColors.violet,
+    accent: CourtColors.blueDark,
     surfaceAlt: CourtColors.darkTray,
     surfaceAlt2: CourtColors.darkTray2,
     line: CourtColors.darkLine,
@@ -570,14 +598,15 @@ ThemeData courtDarkTheme() => _base(
     inkFaint: CourtColors.darkInkFaint,
     successText: CourtColors.darkGreenText,
     accentInk: CourtColors.violetInk,
+    // (no border in the canvas)
     // The canvas keeps the black rim and the hard shadow in dark mode: on an
     // ink-plum surface a black edge still reads as an edge.
-    border: CourtColors.darkLine,
-    shadowInk: CourtColors.darkLine,
+    border: Colors.transparent,
+    shadowInk: Color(0x59000000),
     lineSoft: CourtColors.darkTray2,
     stage: CourtColors.stageDark,
     stageChip: CourtColors.stageChipDark,
-    nav: CourtColors.stageDark,
+    nav: CourtColors.darkSurface,
     mistrial: CourtColors.darkMistrial,
     bubble: CourtColors.bubblePinkDark,
     guiltyBg: CourtColors.guiltyBgDark,

@@ -6,10 +6,13 @@ import '../features/auth/data/auth_providers.dart';
 import '../features/auth/presentation/sign_in_screen.dart';
 import '../features/cases/presentation/case_detail_screen.dart';
 import '../features/cases/presentation/create_case_screen.dart';
-import '../features/cases/presentation/dashboard_screen.dart';
+import '../features/feed/presentation/feed_screen.dart';
+import '../features/game/presentation/profile_screen.dart';
 import '../features/courts/presentation/courts_screen.dart';
 import '../features/notifications/presentation/notifications_screen.dart';
+import '../features/invitations/presentation/defend_screen.dart';
 import '../features/invitations/presentation/invite_screen.dart';
+import '../features/invitations/presentation/jury_screen.dart';
 import '../features/records/presentation/rap_sheet_screen.dart';
 import '../features/settings/presentation/settings_screen.dart';
 import '../features/verdicts/presentation/verdict_screen.dart';
@@ -35,8 +38,14 @@ final routerProvider = Provider<GoRouter>((ref) {
       // GroupChatCourtApp), so this only ever runs with a known answer.
       final signedIn = ref.read(isSignedInProvider);
       final atSignIn = state.matchedLocation == '/sign-in';
+      // A summons and a jury link are capabilities, not account pages: the
+      // token is the whole authorisation, server-side too. Someone answering
+      // a charge is not made to sign up first.
+      final location = state.matchedLocation;
+      final isCapability =
+          location.startsWith('/invite/') || location.startsWith('/jury/');
 
-      if (!signedIn && !atSignIn) return '/sign-in';
+      if (!signedIn && !atSignIn && !isCapability) return '/sign-in';
       if (signedIn && atSignIn) return '/';
       return null;
     },
@@ -58,8 +67,8 @@ final routerProvider = Provider<GoRouter>((ref) {
             routes: [
               GoRoute(
                 path: '/',
-                name: 'dashboard',
-                builder: (_, __) => const DashboardScreen(),
+                name: 'feed',
+                builder: (_, __) => const FeedScreen(),
               ),
             ],
           ),
@@ -93,9 +102,9 @@ final routerProvider = Provider<GoRouter>((ref) {
           StatefulShellBranch(
             routes: [
               GoRoute(
-                path: '/settings',
-                name: 'settings',
-                builder: (_, __) => const SettingsScreen(),
+                path: '/profile',
+                name: 'profile',
+                builder: (_, __) => const ProfileScreen(),
               ),
             ],
           ),
@@ -105,6 +114,29 @@ final routerProvider = Provider<GoRouter>((ref) {
       // Everything below covers the whole screen, pill included: filing, a
       // case file, the ruling and the alert list are all takeovers, which is
       // how the canvas draws them.
+      // The two capability links, answered in the app rather than in a
+      // browser. Both are exempt from the sign-in redirect above: holding the
+      // token is the whole authorisation, exactly as it is on the server.
+      GoRoute(
+        path: '/invite/:token',
+        name: 'defend',
+        builder: (_, state) =>
+            DefendScreen(token: state.pathParameters['token']!),
+      ),
+      GoRoute(
+        path: '/jury/:token',
+        name: 'jury',
+        builder: (_, state) =>
+            JuryScreen(token: state.pathParameters['token']!),
+      ),
+
+      // Settings is reached from the profile rather than being a tab of its
+      // own: the canvas gives that slot to the player card.
+      GoRoute(
+        path: '/settings',
+        name: 'settings',
+        builder: (_, __) => const SettingsScreen(),
+      ),
       GoRoute(
         path: '/notifications',
         name: 'notifications',

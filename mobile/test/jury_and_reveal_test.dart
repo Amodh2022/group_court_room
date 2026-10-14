@@ -85,7 +85,7 @@ void main() {
       await tester.pumpAndSettle();
 
       expect(find.byKey(const Key('overruled')), findsOneWidget);
-      expect(find.text('The jury has been overruled.'), findsOneWidget);
+      expect(find.textContaining('JUDGE OVERRULED'), findsOneWidget);
     });
 
     testWidgets('says nothing when the judge agreed with the jury', (

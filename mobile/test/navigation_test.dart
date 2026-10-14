@@ -63,14 +63,14 @@ void main() {
     testWidgets('a signed-out user lands on sign-in', (tester) async {
       final router = await pumpApp(tester);
       expect(router.state.matchedLocation, '/sign-in');
-      expect(find.text('Settle it in court.'), findsOneWidget);
+      expect(find.text('SIGN IN'), findsOneWidget);
     });
 
     testWidgets('a restored session lands on the dashboard', (tester) async {
       final router = await pumpApp(tester, signedIn: true);
       expect(router.state.matchedLocation, '/');
-      // The canvas has no app bar: the dashboard greets you by name instead.
-      expect(find.text('Alex'), findsWidgets);
+      // The canvas has no app bar: the feed opens on the app name.
+      expect(find.text('Sue Me'), findsWidgets);
     });
 
     testWidgets('signing in moves the user to the dashboard', (tester) async {
@@ -79,7 +79,7 @@ void main() {
       final fields = find.byType(TextFormField);
       await tester.enterText(fields.at(0), 'alex@example.com');
       await tester.enterText(fields.at(1), 'correct-horse');
-      await tester.tap(find.text('Sign in'));
+      await tester.tap(find.text('SIGN IN'));
       await tester.pumpAndSettle();
 
       expect(router.state.matchedLocation, '/');
@@ -119,7 +119,7 @@ void main() {
       router.go('/cases/case-1/verdict');
       await tester.pumpAndSettle();
 
-      expect(find.text(testVerdict.caseTitle), findsWidgets);
+      expect(find.text(testVerdict.caseTitle.toUpperCase()), findsWidgets);
       expect(find.byKey(const Key('verdict-stamp')), findsOneWidget);
     });
 

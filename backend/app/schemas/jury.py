@@ -76,3 +76,6 @@ class RapSheetEntry(BaseModel):
     longest_streak: int
     conviction_rate: float
     last_verdict_at: datetime | None
+    # True for the caller's own record in their own court, so the client can
+    # draw "where you stand" without guessing which row is them.
+    is_you: bool = False

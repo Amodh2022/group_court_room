@@ -47,7 +47,7 @@ void main() {
 
     await tester.pumpAndSettle();
     expect(find.byType(SplashScreen), findsNothing);
-    expect(find.text('Settle it in court.'), findsOneWidget);
+    expect(find.text('SIGN IN'), findsOneWidget);
   });
 
   testWidgets(

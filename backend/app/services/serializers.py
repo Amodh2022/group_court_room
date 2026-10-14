@@ -181,7 +181,8 @@ def _record_title(offender: Offender) -> str:
     return "Known to the Court"
 
 
-def rap_sheet(offenders: list[Offender]) -> list[RapSheetEntry]:
+def rap_sheet(offenders: list[Offender], *, you: str | None = None) -> list[RapSheetEntry]:
+    """Standings. `you` is the slug of the caller's own record, if any."""
     return [
         RapSheetEntry(
             id=o.id,
@@ -196,6 +197,7 @@ def rap_sheet(offenders: list[Offender]) -> list[RapSheetEntry]:
             longest_streak=o.longest_streak,
             conviction_rate=o.conviction_rate,
             last_verdict_at=as_aware(o.last_verdict_at),
+            is_you=you is not None and o.slug == you,
         )
         for index, o in enumerate(offenders, start=1)
     ]

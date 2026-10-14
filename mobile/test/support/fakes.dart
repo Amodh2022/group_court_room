@@ -138,6 +138,48 @@ class FakeApiClient implements ApiClient {
 
   List<Court> courts = const [];
   List<SharedCase> shared = const [];
+
+  /// The game state the server would return. Defaults to a player who has
+  /// done nothing, which is what a fresh account actually looks like.
+  GameState game = buildGameState();
+  CaseRewards rewards = const CaseRewards(totalXp: 0, totalCoins: 0, items: []);
+  ApiException? gameError;
+
+  /// The summons the accused is answering, and what the server said when
+  /// they did.
+  InvitePreview? invite;
+  ApiException? inviteError;
+  ApiException? defenseError;
+  Map<String, String>? lastDefense;
+
+  @override
+  Future<InvitePreview> invitePreview(String token) async {
+    if (inviteError != null) throw inviteError!;
+    return invite ?? buildInvitePreview();
+  }
+
+  @override
+  Future<DefenseAccepted> submitDefense(
+    String token, {
+    required String nickname,
+    required String body,
+  }) async {
+    lastDefense = {'token': token, 'nickname': nickname, 'body': body};
+    if (defenseError != null) throw defenseError!;
+    return DefenseAccepted(
+      caseTitle: (invite ?? buildInvitePreview()).caseTitle,
+      nickname: nickname,
+    );
+  }
+
+  @override
+  Future<GameState> gameState() async {
+    if (gameError != null) throw gameError!;
+    return game;
+  }
+
+  @override
+  Future<CaseRewards> caseRewards(String caseId) async => rewards;
   List<UserRef> people = const [];
   NotificationFeed feed = const NotificationFeed(unread: 0, items: []);
   int readAllCalls = 0;
@@ -286,6 +328,7 @@ class FakeApiClient implements ApiClient {
     String? defendantNickname,
     String? courtId,
     String? accusedUserId,
+    int pettyLevel = 1,
   }) async {
     lastCreate = {
       'court_id': courtId,
@@ -294,6 +337,7 @@ class FakeApiClient implements ApiClient {
       'category': category,
       'accusation': accusation,
       'defendant_nickname': defendantNickname,
+      'petty_level': pettyLevel,
     };
     if (createError != null) throw createError!;
     return detail ??= buildDetail(title: title, category: category);
@@ -424,6 +468,7 @@ RapSheetEntry buildRecord({
   int acquittals = 1,
   int currentStreak = 2,
   int? longestStreak,
+  bool isYou = false,
 }) => RapSheetEntry(
   id: id,
   displayName: displayName,
@@ -436,6 +481,7 @@ RapSheetEntry buildRecord({
   currentStreak: currentStreak,
   longestStreak: longestStreak ?? currentStreak,
   convictionRate: 0.75,
+  isYou: isYou,
 );
 
 const testVerdict = Verdict(
@@ -496,6 +542,31 @@ Widget harness({
   );
 }
 
+/// The same harness around a router a test built itself, for asserting on the
+/// routes a screen links to rather than only on the screen.
+Widget harnessWithRouter({
+  required GoRouter router,
+  required List<Override> overrides,
+  bool animated = false,
+  FakeRooms? rooms,
+}) => ProviderScope(
+  overrides: [
+    courtroomConnectorProvider.overrideWithValue(
+      (rooms ?? FakeRooms()).connect,
+    ),
+    ...overrides,
+  ],
+  child: MaterialApp.router(
+    theme: courtLightTheme(),
+    darkTheme: courtDarkTheme(),
+    routerConfig: router,
+    builder: (context, child) => MediaQuery(
+      data: MediaQuery.of(context).copyWith(disableAnimations: !animated),
+      child: child ?? const SizedBox.shrink(),
+    ),
+  ),
+);
+
 /// Standard setup for a widget test: a realistic phone viewport and a working
 /// key-value store.
 ///
@@ -550,3 +621,80 @@ Future<void> scrollTo(WidgetTester tester, Finder finder) async {
   );
   await tester.pumpAndSettle();
 }
+
+/// A player card for tests. Everything is zero unless a test says otherwise,
+/// because that is what the server returns for an account that has done
+/// nothing.
+GameState buildGameState({
+  String name = 'Alex',
+  int level = 1,
+  int xp = 0,
+  int xpIntoLevel = 0,
+  int coins = 100,
+  int streakDays = 0,
+  List<Quest> quests = const [],
+  List<GameBadge> badges = const [],
+}) => GameState(
+  player: Player(
+    displayName: name,
+    level: level,
+    xp: xp,
+    xpIntoLevel: xpIntoLevel,
+    xpPerLevel: 1000,
+    xpToNextLevel: 1000 - xpIntoLevel,
+    coins: coins,
+    streakDays: streakDays,
+    longestStreakDays: streakDays,
+    badgesEarned: badges.where((b) => b.earned).length,
+    badgesTotal: badges.isEmpty ? 12 : badges.length,
+  ),
+  quests: quests,
+  badges: badges,
+);
+
+Quest buildQuest({
+  String code = 'file_case',
+  String text = 'File a new case',
+  int progress = 0,
+  int target = 1,
+  int xp = 50,
+  bool done = false,
+}) => Quest(
+  code: code,
+  text: text,
+  progress: progress,
+  target: target,
+  xp: xp,
+  done: done,
+);
+
+GameBadge buildBadge({
+  String code = 'first_blood',
+  String name = 'First blood',
+  String glyph = '1',
+  String hint = 'File your first case',
+  bool earned = false,
+}) =>
+    GameBadge(code: code, name: name, glyph: glyph, hint: hint, earned: earned);
+
+/// A summons, as the server would preview it.
+InvitePreview buildInvitePreview({
+  String caseTitle = 'The Last Pizza Slice',
+  String accusation = 'They ate it right after saying they were full.',
+  String plaintiffName = 'Alex',
+  String? defendantNickname = 'SliceBandit',
+  bool alreadySubmitted = false,
+  bool verdictReady = false,
+  int juryCount = 0,
+  DateTime? expiresAt,
+}) => InvitePreview(
+  caseTitle: caseTitle,
+  category: 'food',
+  accusation: accusation,
+  plaintiffName: plaintiffName,
+  defendantNickname: defendantNickname,
+  expiresAt: expiresAt,
+  alreadySubmitted: alreadySubmitted,
+  verdictReady: verdictReady,
+  juryCount: juryCount,
+);

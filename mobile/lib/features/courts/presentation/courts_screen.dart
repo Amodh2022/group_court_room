@@ -9,6 +9,7 @@ import '../../../core/theme.dart';
 import '../../../core/widgets/court_icons.dart';
 import '../../../core/widgets/court_layout.dart';
 import '../../../core/widgets/court_people.dart';
+import '../../../core/widgets/sue_widgets.dart';
 import '../../../core/widgets/court_widgets.dart';
 import '../../auth/data/auth_providers.dart';
 import '../data/court_providers.dart';
@@ -99,22 +100,56 @@ class CourtsScreen extends ConsumerWidget {
       }
     }
 
+    final subtitle = items.isEmpty
+        ? 'No courts yet'
+        : '${items.length} ${items.length == 1 ? 'court' : 'courts'} · '
+              '$people ${people == 1 ? 'person' : 'people'}';
+
     return CourtScaffold(
       title: 'Courts',
-      header: ScreenHeader(
-        title: 'Courts',
-        eyebrow: items.isEmpty
-            ? 'No courts yet'
-            : '${items.length} ${items.length == 1 ? 'court' : 'courts'} · '
-                  '$people ${people == 1 ? 'person' : 'people'}',
-        padding: const EdgeInsets.fromLTRB(20, 22, 20, 14),
-        trailing: [_NewCourtButton(onTap: create)],
+      maxWidth: 640,
+      tablet: _TabletCourts(
+        courts: courts,
+        subtitle: subtitle,
+        onCreate: create,
+        onJoin: join,
+      ),
+      header: Padding(
+        padding: const EdgeInsets.fromLTRB(24, 30, 24, 18),
+        child: Row(
+          children: [
+            Expanded(
+              child: Column(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  const Text(
+                    'Courts',
+                    style: TextStyle(
+                      fontSize: 30,
+                      fontWeight: FontWeight.w600,
+                      height: 1.1,
+                    ),
+                  ),
+                  const SizedBox(height: 4),
+                  Text(
+                    subtitle,
+                    style: TextStyle(
+                      fontSize: 15,
+                      color: context.palette.inkDim,
+                    ),
+                  ),
+                ],
+              ),
+            ),
+            _NewCourtButton(onTap: create),
+          ],
+        ),
       ),
       body: RefreshIndicator(
         onRefresh: () async => ref.refresh(courtsProvider.future),
         child: courts.when(
           loading: () => ListView(
-            padding: const EdgeInsets.fromLTRB(16, 0, 16, courtNavBottomInset),
+            padding: const EdgeInsets.fromLTRB(20, 0, 20, courtNavBottomInset),
             children: const [
               CourtSkeleton(height: 150),
               SizedBox(height: 12),
@@ -135,24 +170,19 @@ class CourtsScreen extends ConsumerWidget {
             ],
           ),
           data: (items) => ListView(
-            padding: const EdgeInsets.fromLTRB(16, 0, 16, courtNavBottomInset),
+            padding: const EdgeInsets.fromLTRB(20, 0, 20, courtNavBottomInset),
             children: [
-              if (items.isNotEmpty) ...[
-                const _RailHeading(label: 'IN SESSION', live: true),
-                const SizedBox(height: 12),
-                for (final court in items)
-                  Padding(
-                    padding: const EdgeInsets.only(bottom: 12),
-                    child: _CourtCard(court: court),
-                  ),
-              ] else
+              if (items.isNotEmpty)
+                _CourtGrid(courts: items)
+              else
                 const _NoCourtsCard(),
-              const SizedBox(height: 10),
-              const _RailHeading(label: 'JOIN ONE'),
-              const SizedBox(height: 10),
-              _JoinRow(onJoin: join),
+              const SizedBox(height: 22),
+              const Text(
+                'Join a court',
+                style: TextStyle(fontSize: 20, fontWeight: FontWeight.w600),
+              ),
               const SizedBox(height: 12),
-              DashedAddTile(label: 'Start a new court', onTap: create),
+              _JoinRow(onJoin: join),
             ],
           ),
         ),
@@ -161,53 +191,119 @@ class CourtsScreen extends ConsumerWidget {
   }
 }
 
-/// The violet key in the header.
+/// Courts as the tablet artboards draw it: the tiles in a grid, and the join
+/// card beside them once the window is landscape-wide.
+class _TabletCourts extends ConsumerWidget {
+  const _TabletCourts({
+    required this.courts,
+    required this.subtitle,
+    required this.onCreate,
+    required this.onJoin,
+  });
+
+  final AsyncValue<List<Court>> courts;
+  final String subtitle;
+  final VoidCallback onCreate;
+  final Future<void> Function(String code) onJoin;
+
+  @override
+  Widget build(BuildContext context, WidgetRef ref) => SueTabletPage(
+    header: SueTabletHeader(
+      title: 'Courts',
+      subtitle: subtitle,
+      trailing: _NewCourtButton(onTap: onCreate),
+    ),
+    child: courts.when(
+      loading: () => ListView(
+        padding: EdgeInsets.zero,
+        children: const [
+          CourtSkeleton(height: 150),
+          SizedBox(height: 12),
+          CourtSkeleton(height: 150),
+        ],
+      ),
+      error: (e, _) => CourtErrorView(
+        message: e is ApiException ? e.message : 'Could not load your courts.',
+        onRetry: () => ref.invalidate(courtsProvider),
+      ),
+      data: (items) => RefreshIndicator(
+        onRefresh: () async => ref.refresh(courtsProvider.future),
+        child: ListView(
+          padding: EdgeInsets.zero,
+          children: [
+            SueColumns(
+              startFlex: 3,
+              endFlex: 2,
+              start: [
+                if (items.isNotEmpty)
+                  _CourtGrid(courts: items)
+                else
+                  const _NoCourtsCard(),
+              ],
+              end: [_JoinCard(onJoin: onJoin, onCreate: onCreate)],
+            ),
+          ],
+        ),
+      ),
+    ),
+  );
+}
+
+/// "JOIN WITH INVITE CODE" — the code box and the way to start a court of
+/// your own, as one card.
+class _JoinCard extends StatelessWidget {
+  const _JoinCard({required this.onJoin, required this.onCreate});
+
+  final Future<void> Function(String code) onJoin;
+  final VoidCallback onCreate;
+
+  @override
+  Widget build(BuildContext context) => SueCard(
+    padding: const EdgeInsets.all(20),
+    child: Column(
+      crossAxisAlignment: CrossAxisAlignment.stretch,
+      children: [
+        const SueSectionLabel('JOIN WITH INVITE CODE'),
+        const SizedBox(height: 12),
+        _JoinRow(onJoin: onJoin),
+        const SizedBox(height: 14),
+        TextButton(
+          onPressed: onCreate,
+          child: const Text('+ Start a new court'),
+        ),
+      ],
+    ),
+  );
+}
+
+/// The round "+" in the header.
 class _NewCourtButton extends StatelessWidget {
   const _NewCourtButton({required this.onTap});
 
   final VoidCallback onTap;
 
   @override
-  Widget build(BuildContext context) => Container(
-    height: 46,
-    decoration: BoxDecoration(
-      color: CourtColors.violet,
-      borderRadius: BorderRadius.circular(courtRadiusPill),
-      border: Border.all(
-        color: context.palette.border,
-        width: courtBorderWidth,
-      ),
-      boxShadow: const [
-        BoxShadow(color: CourtColors.violetInk, offset: Offset(0, 4)),
-      ],
-    ),
-    clipBehavior: Clip.antiAlias,
-    child: Material(
-      type: MaterialType.transparency,
-      child: InkWell(
+  Widget build(BuildContext context) => Semantics(
+    button: true,
+    label: 'New court',
+    child: Tooltip(
+      message: 'New court',
+      child: GestureDetector(
         onTap: onTap,
-        child: const Padding(
-          padding: EdgeInsets.symmetric(horizontal: 14),
-          child: Row(
-            mainAxisSize: MainAxisSize.min,
-            children: [
-              CourtIcon(
-                CourtGlyph.plus,
-                size: 18,
-                color: Colors.white,
-                strokeWidth: 3.2,
-              ),
-              SizedBox(width: 6),
-              Text(
-                'New court',
-                style: TextStyle(
-                  fontFamily: courtDisplayFont,
-                  fontWeight: FontWeight.w700,
-                  fontSize: 16,
-                  color: Colors.white,
-                ),
-              ),
-            ],
+        child: Container(
+          width: 46,
+          height: 46,
+          alignment: Alignment.center,
+          decoration: BoxDecoration(
+            shape: BoxShape.circle,
+            color: context.colors.surfaceContainerHighest,
+            boxShadow: courtHardShadow(context),
+          ),
+          child: CourtIcon(
+            CourtGlyph.plus,
+            size: 20,
+            color: context.palette.accent,
+            strokeWidth: 2.6,
           ),
         ),
       ),
@@ -217,6 +313,7 @@ class _NewCourtButton extends StatelessWidget {
 
 /// A small all-caps rail heading, optionally with the live dot.
 class _RailHeading extends StatefulWidget {
+  // ignore: unused_element_parameter
   const _RailHeading({required this.label, this.live = false});
 
   final String label;
@@ -295,265 +392,160 @@ class _RailHeadingState extends State<_RailHeading>
   }
 }
 
-class _CourtCard extends ConsumerWidget {
-  const _CourtCard({required this.court});
+/// Two columns of court tiles. Each court keeps one accent colour, picked from
+/// its position, so the grid reads as four different places.
+class _CourtGrid extends StatelessWidget {
+  const _CourtGrid({required this.courts});
 
-  final Court court;
-
-  @override
-  Widget build(BuildContext context, WidgetRef ref) {
-    final palette = context.palette;
-    final me = ref.watch(authControllerProvider).valueOrNull?.userId;
-    final owner = me != null && court.ownerId == me;
-    final faces = court.members.take(4).toList();
-
-    return Container(
-      decoration: courtChunk(context, radius: courtRadiusLg, dy: 5),
-      clipBehavior: Clip.antiAlias,
-      child: Material(
-        type: MaterialType.transparency,
-        child: InkWell(
-          onTap: () => context.push('/courts/${court.id}'),
-          child: Padding(
-            padding: const EdgeInsets.all(14),
-            child: Column(
-              crossAxisAlignment: CrossAxisAlignment.start,
-              children: [
-                Row(
-                  crossAxisAlignment: CrossAxisAlignment.start,
-                  children: [
-                    Transform.rotate(
-                      angle: -0.07,
-                      child: Container(
-                        width: 58,
-                        height: 58,
-                        alignment: Alignment.center,
-                        decoration: BoxDecoration(
-                          color: tintFor(court.name),
-                          borderRadius: BorderRadius.circular(18),
-                          border: Border.all(
-                            color: palette.border,
-                            width: courtBorderWidth,
-                          ),
-                        ),
-                        child: Text(
-                          courtMonogram(court.name),
-                          style: const TextStyle(
-                            fontFamily: courtDisplayFont,
-                            fontWeight: FontWeight.w700,
-                            fontSize: 22,
-                            height: 1,
-                            color: CourtColors.lightInk,
-                          ),
-                        ),
-                      ),
-                    ),
-                    const SizedBox(width: 12),
-                    Expanded(
-                      child: Column(
-                        crossAxisAlignment: CrossAxisAlignment.start,
-                        mainAxisSize: MainAxisSize.min,
-                        children: [
-                          Text(
-                            court.name,
-                            maxLines: 2,
-                            overflow: TextOverflow.ellipsis,
-                            style: const TextStyle(
-                              fontFamily: courtDisplayFont,
-                              fontWeight: FontWeight.w700,
-                              fontSize: 21,
-                              height: 1.1,
-                            ),
-                          ),
-                          const SizedBox(height: 6),
-                          Row(
-                            children: [
-                              // Overlapping faces are a Stack, not negative
-                              // margins: Container asserts a non-negative
-                              // margin and throws on layout.
-                              if (faces.isNotEmpty)
-                                // Flexible + scaleDown: five faces are wider
-                                // than the name column on a 320px phone, and a
-                                // fixed stack would overflow it.
-                                Flexible(
-                                  child: FittedBox(
-                                    fit: BoxFit.scaleDown,
-                                    alignment: Alignment.centerLeft,
-                                    child: SizedBox(
-                                      width: 26 + 20.0 * (faces.length - 1),
-                                      height: 26,
-                                      child: Stack(
-                                        children: [
-                                          for (var i = 0; i < faces.length; i++)
-                                            Positioned(
-                                              left: i * 20.0,
-                                              child: Container(
-                                                width: 26,
-                                                height: 26,
-                                                alignment: Alignment.center,
-                                                decoration: BoxDecoration(
-                                                  shape: BoxShape.circle,
-                                                  color: tintFor(
-                                                    faces[i].displayName,
-                                                  ),
-                                                  border: Border.all(
-                                                    color: palette.border,
-                                                    width: courtBorderThin,
-                                                  ),
-                                                ),
-                                                child: Text(
-                                                  faces[i].displayName
-                                                          .trim()
-                                                          .isEmpty
-                                                      ? '?'
-                                                      : faces[i].displayName
-                                                            .trim()[0]
-                                                            .toUpperCase(),
-                                                  style: const TextStyle(
-                                                    fontFamily:
-                                                        courtDisplayFont,
-                                                    fontWeight: FontWeight.w700,
-                                                    fontSize: 11,
-                                                    height: 1,
-                                                    color: CourtColors.lightInk,
-                                                  ),
-                                                ),
-                                              ),
-                                            ),
-                                        ],
-                                      ),
-                                    ),
-                                  ),
-                                ),
-                              const SizedBox(width: 10),
-                              Flexible(
-                                child: Text(
-                                  '${court.members.length} '
-                                  '${court.members.length == 1 ? 'member' : 'members'}',
-                                  maxLines: 1,
-                                  overflow: TextOverflow.ellipsis,
-                                  style: TextStyle(
-                                    fontSize: 12,
-                                    fontWeight: FontWeight.w800,
-                                    color: palette.inkDim,
-                                  ),
-                                ),
-                              ),
-                            ],
-                          ),
-                        ],
-                      ),
-                    ),
-                    const SizedBox(width: 8),
-                    CourtPill(
-                      label: owner ? 'YOURS' : 'MEMBER',
-                      fill: owner ? CourtColors.red : palette.surfaceAlt,
-                      foreground: owner ? Colors.white : palette.inkDim,
-                      bordered: true,
-                      fontSize: 11,
-                    ),
-                  ],
-                ),
-                const SizedBox(height: 12),
-                IntrinsicHeight(
-                  child: Row(
-                    crossAxisAlignment: CrossAxisAlignment.stretch,
-                    children: [
-                      Expanded(
-                        child: _MiniBox(
-                          label: 'INVITE CODE',
-                          value: court.inviteCode,
-                          fill: palette.surfaceAlt,
-                        ),
-                      ),
-                      const SizedBox(width: 8),
-                      _MiniBox(
-                        label: 'FILE HERE',
-                        value: 'Sue',
-                        fill: CourtColors.violet,
-                        foreground: Colors.white,
-                        onTap: () =>
-                            context.push('/cases/new?court=${court.id}'),
-                      ),
-                    ],
-                  ),
-                ),
-              ],
-            ),
-          ),
-        ),
-      ),
-    );
-  }
-}
-
-class _MiniBox extends StatelessWidget {
-  const _MiniBox({
-    required this.label,
-    required this.value,
-    required this.fill,
-    this.foreground,
-    this.onTap,
-  });
-
-  final String label;
-  final String value;
-  final Color fill;
-  final Color? foreground;
-  final VoidCallback? onTap;
+  final List<Court> courts;
 
   @override
   Widget build(BuildContext context) {
-    final fg = foreground ?? context.colors.onSurface;
-    final body = Container(
-      constraints: const BoxConstraints(minWidth: 74),
-      padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 8),
-      decoration: BoxDecoration(
-        color: fill,
-        borderRadius: BorderRadius.circular(courtRadiusSm),
-      ),
+    const tones = [SueTone.orange, SueTone.blue, SueTone.teal, SueTone.gray];
+    final rows = <Widget>[];
+    for (var i = 0; i < courts.length; i += 2) {
+      rows.add(
+        IntrinsicHeight(
+          child: Row(
+            crossAxisAlignment: CrossAxisAlignment.stretch,
+            children: [
+              Expanded(
+                child: _CourtTile(court: courts[i], tone: tones[i % 4]),
+              ),
+              const SizedBox(width: 12),
+              Expanded(
+                child: i + 1 < courts.length
+                    ? _CourtTile(court: courts[i + 1], tone: tones[(i + 1) % 4])
+                    : const SizedBox.shrink(),
+              ),
+            ],
+          ),
+        ),
+      );
+      if (i + 2 < courts.length) rows.add(const SizedBox(height: 12));
+    }
+    return Column(children: rows);
+  }
+}
+
+class _CourtTile extends ConsumerWidget {
+  const _CourtTile({required this.court, required this.tone});
+
+  final Court court;
+  final SueTone tone;
+
+  @override
+  Widget build(BuildContext context, WidgetRef ref) {
+    final me = ref.watch(authControllerProvider).valueOrNull?.userId;
+    final owner = me != null && court.ownerId == me;
+    final color = tone.fg(context);
+    final n = court.members.length;
+    final faces = court.members.take(4).toList();
+    return SueCard(
+      radius: 20,
+      padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 16),
+      onTap: () => context.push('/courts/${court.id}'),
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
-        mainAxisSize: MainAxisSize.min,
         children: [
+          Row(
+            mainAxisAlignment: MainAxisAlignment.spaceBetween,
+            children: [
+              Container(
+                width: 34,
+                height: 34,
+                alignment: Alignment.center,
+                decoration: BoxDecoration(
+                  shape: BoxShape.circle,
+                  border: Border.all(color: color, width: 3),
+                ),
+                child: Text(
+                  courtMonogram(court.name),
+                  style: TextStyle(
+                    fontSize: 11,
+                    fontWeight: FontWeight.w700,
+                    color: color,
+                  ),
+                ),
+              ),
+              if (owner)
+                const Flexible(
+                  child: Padding(
+                    padding: EdgeInsets.only(left: 6),
+                    child: FittedBox(
+                      fit: BoxFit.scaleDown,
+                      child: SuePill('OWNER', tone: SueTone.gold),
+                    ),
+                  ),
+                ),
+            ],
+          ),
+          const SizedBox(height: 12),
           Text(
-            label,
-            maxLines: 1,
-            overflow: TextOverflow.ellipsis,
+            '$n ${n == 1 ? 'MEMBER' : 'MEMBERS'}',
             style: TextStyle(
               fontSize: 10,
-              fontWeight: FontWeight.w900,
-              letterSpacing: 1,
-              color: fg.withValues(alpha: 0.75),
+              fontWeight: FontWeight.w500,
+              letterSpacing: 1.2,
+              color: context.palette.inkDim,
             ),
           ),
+          const SizedBox(height: 8),
           Text(
-            value,
-            maxLines: 1,
+            court.name,
+            maxLines: 2,
             overflow: TextOverflow.ellipsis,
-            style: TextStyle(
-              fontFamily: courtDisplayFont,
-              fontWeight: FontWeight.w700,
-              fontSize: 17,
+            style: const TextStyle(
+              fontSize: 18,
+              fontWeight: FontWeight.w600,
               height: 1.2,
-              color: fg,
+            ),
+          ),
+          const SizedBox(height: 10),
+          SizedBox(
+            height: 24,
+            width: faces.isEmpty ? 0 : 24.0 + (faces.length - 1) * 18,
+            child: Stack(
+              children: [
+                for (var i = 0; i < faces.length; i++)
+                  Positioned(
+                    left: i * 18.0,
+                    child: Container(
+                      width: 24,
+                      height: 24,
+                      alignment: Alignment.center,
+                      decoration: BoxDecoration(
+                        shape: BoxShape.circle,
+                        color: Color.alphaBlend(
+                          toneFor(faces[i].displayName).tint(context),
+                          context.colors.surfaceContainerHighest,
+                        ),
+                        border: Border.all(
+                          color: context.colors.surfaceContainerHighest,
+                          width: 2,
+                        ),
+                      ),
+                      child: Text(
+                        faces[i].displayName.isEmpty
+                            ? '?'
+                            : faces[i].displayName[0].toUpperCase(),
+                        style: TextStyle(
+                          fontSize: 10,
+                          fontWeight: FontWeight.w600,
+                          color: toneFor(faces[i].displayName).fg(context),
+                        ),
+                      ),
+                    ),
+                  ),
+              ],
             ),
           ),
         ],
       ),
     );
-
-    if (onTap == null) return body;
-    return Material(
-      color: Colors.transparent,
-      borderRadius: BorderRadius.circular(courtRadiusSm),
-      clipBehavior: Clip.antiAlias,
-      child: InkWell(onTap: onTap, child: body),
-    );
   }
 }
 
-/// The dashed invite-code field and its dark Join key.
 class _JoinRow extends StatefulWidget {
   const _JoinRow({required this.onJoin});
 
@@ -574,53 +566,40 @@ class _JoinRowState extends State<_JoinRow> {
 
   @override
   Widget build(BuildContext context) {
-    final palette = context.palette;
-    return Row(
-      children: [
-        Expanded(
-          child: SizedBox(
-            height: 50,
+    return SueCard(
+      small: true,
+      radius: 16,
+      padding: const EdgeInsets.all(8),
+      child: Row(
+        children: [
+          Expanded(
             child: TextField(
               controller: _controller,
               textCapitalization: TextCapitalization.characters,
               onSubmitted: widget.onJoin,
-              style: const TextStyle(fontWeight: FontWeight.w800, fontSize: 15),
+              style: const TextStyle(fontSize: 16),
               decoration: InputDecoration(
-                hintText: 'Got an invite code?',
+                hintText: 'Enter invite code',
                 filled: false,
-                contentPadding: const EdgeInsets.symmetric(horizontal: 14),
-                enabledBorder: OutlineInputBorder(
-                  borderRadius: BorderRadius.circular(courtRadiusSm + 2),
-                  borderSide: BorderSide(
-                    color: palette.inkFaint,
-                    width: courtBorderWidth,
-                  ),
-                ),
-                focusedBorder: OutlineInputBorder(
-                  borderRadius: BorderRadius.circular(courtRadiusSm + 2),
-                  borderSide: BorderSide(
-                    color: palette.accent,
-                    width: courtBorderWidth,
-                  ),
-                ),
+                border: InputBorder.none,
+                enabledBorder: InputBorder.none,
+                focusedBorder: InputBorder.none,
+                contentPadding: const EdgeInsets.symmetric(horizontal: 10),
+                hintStyle: TextStyle(color: context.palette.inkDim),
               ),
             ),
           ),
-        ),
-        const SizedBox(width: 8),
-        SizedBox(
-          height: 50,
-          child: CourtKey(
-            label: 'Join',
-            height: 50,
-            radius: courtRadiusSm + 2,
-            fill: context.colors.onSurface,
-            foreground: context.colors.surface,
-            shadowInk: palette.border,
-            onPressed: () => widget.onJoin(_controller.text.trim()),
+          const SizedBox(width: 10),
+          SizedBox(
+            width: 92,
+            child: SueButton(
+              label: 'JOIN',
+              height: 46,
+              onPressed: () => widget.onJoin(_controller.text.trim()),
+            ),
           ),
-        ),
-      ],
+        ],
+      ),
     );
   }
 }

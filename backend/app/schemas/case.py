@@ -29,6 +29,8 @@ class CaseCreate(BaseModel):
     defendant_nickname: Nickname | None = None
     court_id: uuid.UUID | None = None
     accused_user_id: uuid.UUID | None = None
+    #: How petty the plaintiff says it is, 1-3. Multiplies the XP the case pays.
+    petty_level: int = Field(default=1, ge=1, le=3)
 
     _normalise = field_validator("title", "accusation", "defendant_nickname", mode="before")(
         _strip

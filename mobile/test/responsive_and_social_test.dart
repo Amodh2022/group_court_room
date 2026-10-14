@@ -178,8 +178,10 @@ void main() {
       tester,
     ) async {
       await pumpApp(tester, const Size(1200, 900));
-      final card = find.text('The Last Pizza Slice');
-      expect(card, findsOneWidget);
+      // The tablet artboard repeats a live case in its side panel, so the
+      // title is on screen more than once; what matters is that the column it
+      // is read in stays narrow.
+      expect(find.text('The Last Pizza Slice'), findsWidgets);
       final box = tester.getRect(find.byType(ListView).first);
       expect(box.width, lessThanOrEqualTo(1000));
     });
@@ -199,13 +201,16 @@ void main() {
       // across a tab change. When every screen drew its own, this came back
       // as a different element each time and the pill visibly blinked.
       final before = tester.element(find.byType(CourtNavBar));
-      await tester.tap(find.byTooltip('Rap sheet'));
+      await tester.tap(find.byTooltip('Leaderboard'));
       await tester.pumpAndSettle();
       await tester.tap(find.byTooltip('Courts'));
       await tester.pumpAndSettle();
 
       expect(find.byType(CourtNavBar), findsOneWidget);
-      expect(identical(tester.element(find.byType(CourtNavBar)), before), isTrue);
+      expect(
+        identical(tester.element(find.byType(CourtNavBar)), before),
+        isTrue,
+      );
     });
 
     testWidgets('each tab keeps its own place', (tester) async {
@@ -214,7 +219,7 @@ void main() {
       await tester.pumpAndSettle();
       expect(find.text('INVITE CODE'), findsOneWidget);
 
-      await tester.tap(find.byTooltip('Home'));
+      await tester.tap(find.byTooltip('Feed'));
       await tester.pumpAndSettle();
       expect(find.text('INVITE CODE'), findsNothing);
 
@@ -307,8 +312,8 @@ void main() {
       await tester.pumpAndSettle();
 
       // Once the court can name the accused, the key names them too.
-      await tester.ensureVisible(find.text('Sue Sam'));
-      await tester.tap(find.text('Sue Sam'));
+      await tester.ensureVisible(find.text('SUE SAM'));
+      await tester.tap(find.text('SUE SAM'));
       await tester.pumpAndSettle();
 
       expect(api.lastCreate?['court_id'], 'court-1');
@@ -317,13 +322,18 @@ void main() {
   });
 
   group('shared cases and notifications', () {
-    testWidgets('dashboard lists cases shared with me', (tester) async {
+    testWidgets('the feed lists a summons and the vote is cast in the app', (
+      tester,
+    ) async {
       await pumpApp(tester, const Size(360, 800));
-      expect(find.text('Needs you'), findsOneWidget);
-      expect(find.text('JURY DUTY'), findsOneWidget);
-      await tester.tap(find.text('Open the summons'));
+      expect(find.text('Who Left The Group'), findsOneWidget);
+      expect(find.text('JURY LIVE'), findsOneWidget);
+      await tester.ensureVisible(find.text('GUILTY'));
+      await tester.tap(find.text('GUILTY'));
       await tester.pumpAndSettle();
-      expect(find.textContaining('/jury/tok123'), findsOneWidget);
+      // The ballot went through the API, not out to a browser.
+      expect(api.ballots.single.$1, 'tok123');
+      expect(api.ballots.single.$2, 'guilty');
     });
 
     testWidgets('the bell shows the unread count and opens the list', (

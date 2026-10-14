@@ -10,7 +10,6 @@ import '../../../core/widgets/court_icons.dart';
 import '../../../core/widgets/court_layout.dart';
 import '../../../core/widgets/court_widgets.dart';
 import '../../auth/data/auth_providers.dart';
-import '../../cases/presentation/dashboard_screen.dart' show showAnswerLink;
 import '../../courts/data/court_providers.dart';
 
 class NotificationsScreen extends ConsumerStatefulWidget {
@@ -122,24 +121,18 @@ class _NotificationTile extends StatelessWidget {
     _ => Icons.how_to_vote_outlined,
   };
 
-  /// Summons go to the defense, jury duty to the jury box, court invites to
+  /// Summons go to the defence, jury duty to the jury box, court invites to
   /// the court; the same routing the web bell uses.
+  ///
+  /// These open in the app. They used to hand over the web URL and a "copy
+  /// link to answer in browser" button, which sent somebody who already had
+  /// the app out of it to answer their own summons.
   void _open(BuildContext context) {
     final token = item.token;
     if (item.linkKind == 'invite' && token != null) {
-      showAnswerLink(
-        context,
-        heading: 'Your defense',
-        message: item.text,
-        path: '/invite/$token',
-      );
+      context.push('/invite/$token');
     } else if (item.linkKind == 'jury' && token != null) {
-      showAnswerLink(
-        context,
-        heading: 'Jury duty',
-        message: item.text,
-        path: '/jury/$token',
-      );
+      context.push('/jury/$token');
     } else if (item.courtId != null) {
       context.go('/courts/${item.courtId}');
     }

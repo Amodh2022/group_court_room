@@ -481,14 +481,20 @@ class BottomDock extends StatelessWidget {
       borderRadius: const BorderRadius.vertical(
         top: Radius.circular(courtRadiusXl),
       ),
-      border: Border(
-        top: BorderSide(color: context.palette.border, width: courtBorderWidth),
-      ),
+      boxShadow: [
+        BoxShadow(
+          color: context.isDark
+              ? const Color(0x59000000)
+              : const Color(0x141E2235),
+          offset: const Offset(0, -8),
+          blurRadius: 24,
+        ),
+      ],
     ),
     child: SafeArea(
       top: false,
       child: Padding(
-        padding: const EdgeInsets.fromLTRB(16, 14, 16, 14),
+        padding: const EdgeInsets.fromLTRB(20, 14, 20, 14),
         child: child,
       ),
     ),
@@ -499,10 +505,10 @@ class BottomDock extends StatelessWidget {
 /// slots; the middle one is the filing key, which is an action rather than a
 /// destination, so it is not a tab.
 enum CourtTab {
-  home('/', CourtGlyph.home, 'Home'),
+  home('/', CourtGlyph.home, 'Feed'),
   courts('/courts', CourtGlyph.courts, 'Courts'),
-  record('/rap-sheet', CourtGlyph.trophy, 'Rap sheet'),
-  settings('/settings', CourtGlyph.person, 'Profile');
+  record('/rap-sheet', CourtGlyph.trophy, 'Leaderboard'),
+  settings('/profile', CourtGlyph.person, 'Profile');
 
   const CourtTab(this.path, this.glyph, this.label);
   final String path;
@@ -539,12 +545,12 @@ class CourtNavBar extends StatelessWidget {
     return Material(
       // As a Scaffold's bottomNavigationBar this is the outermost widget in
       // that slot, and nothing above it is a Material — without this every
-      // InkWell in the pill would assert instead of rippling.
+      // InkWell in the bar would assert instead of rippling.
       type: MaterialType.transparency,
       child: Padding(
-        // 34 of head-room so the raised key is inside this widget's own bounds
-        // and never gets clipped by the bottom-bar slot.
-        padding: const EdgeInsets.fromLTRB(16, 34, 16, 0),
+        // Head-room so the raised key sits inside this widget's own bounds
+        // and is not clipped by the bottom-bar slot.
+        padding: const EdgeInsets.only(top: 40),
         child: SizedBox(
           height: courtNavHeight,
           child: Stack(
@@ -554,24 +560,30 @@ class CourtNavBar extends StatelessWidget {
                 child: DecoratedBox(
                   decoration: BoxDecoration(
                     color: palette.nav,
-                    borderRadius: BorderRadius.circular(courtRadiusPill),
-                    border: Border.all(
-                      color: palette.border,
-                      width: courtBorderWidth,
+                    borderRadius: const BorderRadius.vertical(
+                      top: Radius.circular(26),
                     ),
-                    boxShadow: courtHardShadow(context),
+                    boxShadow: [
+                      BoxShadow(
+                        color: context.isDark
+                            ? const Color(0x59000000)
+                            : const Color(0x0F1E2235),
+                        offset: const Offset(0, -8),
+                        blurRadius: 24,
+                      ),
+                    ],
                   ),
                 ),
               ),
               Positioned.fill(
                 child: Padding(
-                  padding: const EdgeInsets.symmetric(horizontal: 8),
+                  padding: const EdgeInsets.symmetric(horizontal: 16),
                   child: Row(
                     mainAxisAlignment: MainAxisAlignment.spaceAround,
                     children: [
                       for (final tab in _order)
                         if (tab == null)
-                          _FilingKey(key: const Key('nav-file'))
+                          const _FilingKey(key: Key('nav-file'))
                         else
                           _NavSlot(
                             tab: tab,
@@ -613,16 +625,12 @@ class _NavSlot extends StatelessWidget {
         child: Container(
           width: 48,
           height: 48,
-          decoration: BoxDecoration(
-            shape: BoxShape.circle,
-            color: selected ? CourtColors.yellow : Colors.transparent,
-          ),
           alignment: Alignment.center,
           child: CourtIcon(
             tab.glyph,
-            size: tab == CourtTab.record ? 22 : 24,
-            color: selected ? CourtColors.lightInk : CourtColors.stageDim,
-            strokeWidth: tab == CourtTab.record ? 2.8 : 2.6,
+            size: 22,
+            color: selected ? context.palette.accent : context.palette.inkFaint,
+            strokeWidth: 2,
           ),
         ),
       ),
@@ -640,7 +648,7 @@ class _FilingKey extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) => Transform.translate(
-    offset: const Offset(0, -34),
+    offset: const Offset(0, -40),
     child: Semantics(
       button: true,
       label: 'File a case',
@@ -650,24 +658,25 @@ class _FilingKey extends StatelessWidget {
           customBorder: const CircleBorder(),
           onTap: () => context.push('/cases/new'),
           child: Container(
-            width: 66,
-            height: 66,
+            width: 58,
+            height: 58,
             decoration: BoxDecoration(
               shape: BoxShape.circle,
-              color: CourtColors.violet,
-              border: Border.all(
-                color: context.palette.border,
-                width: courtBorderWidth,
-              ),
-              boxShadow: const [
-                BoxShadow(color: CourtColors.violetInk, offset: Offset(0, 5)),
+              color: context.palette.accent,
+              boxShadow: [
+                BoxShadow(
+                  color: context.palette.accent.withValues(alpha: .4),
+                  offset: const Offset(0, 10),
+                  blurRadius: 22,
+                ),
               ],
             ),
             alignment: Alignment.center,
-            child: const CourtIcon(
-              CourtGlyph.gavel,
-              size: 30,
-              color: Colors.white,
+            child: CourtIcon(
+              CourtGlyph.plus,
+              size: 24,
+              color: context.isDark ? const Color(0xFF0F121B) : Colors.white,
+              strokeWidth: 2.6,
             ),
           ),
         ),

@@ -137,6 +137,7 @@ class RapSheetEntry {
     required this.currentStreak,
     required this.longestStreak,
     required this.convictionRate,
+    this.isYou = false,
   });
 
   final String id;
@@ -151,6 +152,11 @@ class RapSheetEntry {
   final int longestStreak;
   final double convictionRate;
 
+  /// The caller's own record in their own court. The server decides this;
+  /// a rap sheet row carries a record id, not a user id, so the client
+  /// cannot work it out for itself.
+  final bool isYou;
+
   factory RapSheetEntry.fromJson(Map<String, dynamic> json) => RapSheetEntry(
     id: json['id'] as String,
     displayName: json['display_name'] as String? ?? 'Unknown',
@@ -163,6 +169,7 @@ class RapSheetEntry {
     currentStreak: json['current_streak'] as int? ?? 0,
     longestStreak: json['longest_streak'] as int? ?? 0,
     convictionRate: (json['conviction_rate'] as num? ?? 0).toDouble(),
+    isYou: json['is_you'] as bool? ?? false,
   );
 }
 
@@ -573,4 +580,262 @@ class JuryRoom {
         ? null
         : JuryTally.fromJson(json['tally'] as Map<String, dynamic>),
   );
+}
+
+// --- the game layer --------------------------------------------------------
+
+/// One badge in the catalogue, earned or still to earn.
+///
+/// `GameBadge`, not `Badge`: Material has a `Badge` widget, and a screen that
+/// draws badges needs both names in scope.
+class GameBadge {
+  const GameBadge({
+    required this.code,
+    required this.name,
+    required this.glyph,
+    required this.hint,
+    required this.earned,
+    this.earnedAt,
+  });
+
+  final String code;
+  final String name;
+
+  /// One or two characters for the hexagon on the player card.
+  final String glyph;
+
+  /// How it was earned, or how to earn it.
+  final String hint;
+  final bool earned;
+  final DateTime? earnedAt;
+
+  factory GameBadge.fromJson(Map<String, dynamic> json) => GameBadge(
+    code: json['code'] as String? ?? '',
+    name: json['name'] as String? ?? '',
+    glyph: json['glyph'] as String? ?? '?',
+    hint: json['hint'] as String? ?? '',
+    earned: json['earned'] as bool? ?? false,
+    earnedAt: json['earned_at'] == null
+        ? null
+        : DateTime.tryParse(json['earned_at'] as String)?.toLocal(),
+  );
+}
+
+/// One of today's quests.
+class Quest {
+  const Quest({
+    required this.code,
+    required this.text,
+    required this.progress,
+    required this.target,
+    required this.xp,
+    required this.done,
+  });
+
+  final String code;
+  final String text;
+  final int progress;
+  final int target;
+  final int xp;
+  final bool done;
+
+  double get fraction => target <= 0 ? 0 : (progress / target).clamp(0, 1);
+
+  factory Quest.fromJson(Map<String, dynamic> json) => Quest(
+    code: json['code'] as String? ?? '',
+    text: json['text'] as String? ?? '',
+    progress: json['progress'] as int? ?? 0,
+    target: json['target'] as int? ?? 1,
+    xp: json['xp'] as int? ?? 0,
+    done: json['done'] as bool? ?? false,
+  );
+}
+
+/// The player card: level, experience, coins and streak.
+class Player {
+  const Player({
+    required this.displayName,
+    required this.level,
+    required this.xp,
+    required this.xpIntoLevel,
+    required this.xpPerLevel,
+    required this.xpToNextLevel,
+    required this.coins,
+    required this.streakDays,
+    required this.longestStreakDays,
+    required this.badgesEarned,
+    required this.badgesTotal,
+  });
+
+  final String displayName;
+  final int level;
+  final int xp;
+  final int xpIntoLevel;
+  final int xpPerLevel;
+  final int xpToNextLevel;
+  final int coins;
+  final int streakDays;
+  final int longestStreakDays;
+  final int badgesEarned;
+  final int badgesTotal;
+
+  double get levelFraction =>
+      xpPerLevel <= 0 ? 0 : (xpIntoLevel / xpPerLevel).clamp(0, 1);
+
+  factory Player.fromJson(Map<String, dynamic> json) => Player(
+    displayName: json['display_name'] as String? ?? '',
+    level: json['level'] as int? ?? 1,
+    xp: json['xp'] as int? ?? 0,
+    xpIntoLevel: json['xp_into_level'] as int? ?? 0,
+    xpPerLevel: json['xp_per_level'] as int? ?? 1000,
+    xpToNextLevel: json['xp_to_next_level'] as int? ?? 1000,
+    coins: json['coins'] as int? ?? 0,
+    streakDays: json['streak_days'] as int? ?? 0,
+    longestStreakDays: json['longest_streak_days'] as int? ?? 0,
+    badgesEarned: json['badges_earned'] as int? ?? 0,
+    badgesTotal: json['badges_total'] as int? ?? 0,
+  );
+}
+
+/// Everything the game screens need, in one call.
+class GameState {
+  const GameState({
+    required this.player,
+    required this.quests,
+    required this.badges,
+  });
+
+  final Player player;
+  final List<Quest> quests;
+  final List<GameBadge> badges;
+
+  factory GameState.fromJson(Map<String, dynamic> json) => GameState(
+    player: Player.fromJson(
+      (json['player'] as Map?)?.cast<String, dynamic>() ?? const {},
+    ),
+    quests: ((json['quests'] as List?) ?? const [])
+        .map((e) => Quest.fromJson((e as Map).cast<String, dynamic>()))
+        .toList(),
+    badges: ((json['badges'] as List?) ?? const [])
+        .map((e) => GameBadge.fromJson((e as Map).cast<String, dynamic>()))
+        .toList(),
+  );
+}
+
+/// One line on the verdict's rewards card.
+class Reward {
+  const Reward({
+    required this.kind,
+    required this.detail,
+    required this.xp,
+    required this.coins,
+    this.badgeCode,
+    this.badgeName,
+    this.levelReached,
+  });
+
+  final String kind;
+  final String detail;
+  final int xp;
+  final int coins;
+  final String? badgeCode;
+  final String? badgeName;
+  final int? levelReached;
+
+  factory Reward.fromJson(Map<String, dynamic> json) => Reward(
+    kind: json['kind'] as String? ?? '',
+    detail: json['detail'] as String? ?? '',
+    xp: json['xp'] as int? ?? 0,
+    coins: json['coins'] as int? ?? 0,
+    badgeCode: json['badge_code'] as String?,
+    badgeName: json['badge_name'] as String?,
+    levelReached: json['level_reached'] as int?,
+  );
+}
+
+/// What one case paid one player. Empty until the judge has ruled.
+class CaseRewards {
+  const CaseRewards({
+    required this.totalXp,
+    required this.totalCoins,
+    required this.items,
+    this.levelReached,
+  });
+
+  final int totalXp;
+  final int totalCoins;
+  final int? levelReached;
+  final List<Reward> items;
+
+  bool get isEmpty => items.isEmpty;
+
+  factory CaseRewards.fromJson(Map<String, dynamic> json) => CaseRewards(
+    totalXp: json['total_xp'] as int? ?? 0,
+    totalCoins: json['total_coins'] as int? ?? 0,
+    levelReached: json['level_reached'] as int?,
+    items: ((json['items'] as List?) ?? const [])
+        .map((e) => Reward.fromJson((e as Map).cast<String, dynamic>()))
+        .toList(),
+  );
+}
+
+// --- answering a summons ---------------------------------------------------
+
+/// What the accused is shown before they write. Deliberately thin: the charge
+/// and who brought it, and nothing else about the case or the plaintiff's
+/// account.
+class InvitePreview {
+  const InvitePreview({
+    required this.caseTitle,
+    required this.category,
+    required this.accusation,
+    required this.plaintiffName,
+    required this.alreadySubmitted,
+    required this.verdictReady,
+    required this.juryCount,
+    this.defendantNickname,
+    this.expiresAt,
+  });
+
+  final String caseTitle;
+  final String category;
+  final String accusation;
+  final String plaintiffName;
+  final String? defendantNickname;
+  final DateTime? expiresAt;
+
+  /// A defence is already on the record; this link cannot be used again.
+  final bool alreadySubmitted;
+  final bool verdictReady;
+
+  /// How many of the group are already in the jury box.
+  final int juryCount;
+
+  factory InvitePreview.fromJson(Map<String, dynamic> json) => InvitePreview(
+    caseTitle: json['case_title'] as String? ?? '',
+    category: json['category'] as String? ?? '',
+    accusation: json['accusation'] as String? ?? '',
+    plaintiffName: json['plaintiff_name'] as String? ?? 'The plaintiff',
+    defendantNickname: json['defendant_nickname'] as String?,
+    expiresAt: json['expires_at'] == null
+        ? null
+        : DateTime.tryParse(json['expires_at'] as String)?.toLocal(),
+    alreadySubmitted: json['already_submitted'] as bool? ?? false,
+    verdictReady: json['verdict_ready'] as bool? ?? false,
+    juryCount: json['jury_count'] as int? ?? 0,
+  );
+}
+
+/// The receipt for a defence the court has accepted.
+class DefenseAccepted {
+  const DefenseAccepted({required this.caseTitle, required this.nickname});
+
+  final String caseTitle;
+  final String nickname;
+
+  factory DefenseAccepted.fromJson(Map<String, dynamic> json) =>
+      DefenseAccepted(
+        caseTitle: json['case_title'] as String? ?? '',
+        nickname: json['nickname'] as String? ?? '',
+      );
 }

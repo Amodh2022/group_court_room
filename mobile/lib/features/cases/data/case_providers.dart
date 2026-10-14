@@ -4,6 +4,7 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 
 import '../../../core/api_client.dart';
 import '../../../core/models.dart';
+import '../../game/data/game_providers.dart';
 import '../../auth/data/auth_providers.dart';
 import '../../courts/data/court_providers.dart';
 
@@ -125,6 +126,7 @@ class CaseActions {
     String? defendantNickname,
     String? courtId,
     String? accusedUserId,
+    int pettyLevel = 1,
   }) async {
     final created = await _api.createCase(
       courtId: courtId,
@@ -133,8 +135,12 @@ class CaseActions {
       category: category,
       accusation: accusation,
       defendantNickname: defendantNickname,
+      pettyLevel: pettyLevel,
     );
     _ref.invalidate(casesProvider);
+    // Filing costs coins and moves a quest, so the player card is stale the
+    // moment this returns.
+    _ref.invalidate(gameStateProvider);
     return created;
   }
 

@@ -22,9 +22,16 @@ from app.llm.base import (
     VerdictGeneration,
     VerdictRequest,
 )
-from app.models import Case, CaseStatus, Offender, ParticipantRole, Verdict
+from app.models import Case, CaseStatus, JuryVoteKind, Offender, ParticipantRole, Verdict
 from app.prompts.verdict_prompt import PROMPT_VERSION
-from app.services import chat_service, jury_service, offender_service, safety, social_service
+from app.services import (
+    chat_service,
+    game_service,
+    jury_service,
+    offender_service,
+    safety,
+    social_service,
+)
 from app.services.case_service import participant
 
 logger = logging.getLogger(__name__)
@@ -194,11 +201,17 @@ class VerdictService:
         if record:
             # After the commit, and never inside it: a bookkeeping failure must
             # not cost the user the verdict they already waited for.
+            kind = str(result.get("verdict", ""))
             try:
-                offender_service.record_verdict(db, case, str(result.get("verdict", "")))
+                offender_service.record_verdict(db, case, kind)
             # Records are not worth a lost verdict.
             except Exception:
                 logger.exception("record.update_failed", extra={"case_id": str(case.id)})
+            try:
+                self._settle_game(db, case, kind)
+            # Neither is the game.
+            except Exception:
+                logger.exception("game.settle_failed", extra={"case_id": str(case.id)})
 
         chat_service.verdict_in(db, case)
 
@@ -208,6 +221,26 @@ class VerdictService:
                    "prompt_version": prompt_version},
         )
         return verdict
+
+    @staticmethod
+    def _settle_game(db: Session, case: Case, kind: str) -> None:
+        """Pay out the ruling: both sides, then the jurors who called it.
+
+        The two badges that depend on how the jury split are awarded here too,
+        where the tally and the ruling are both in hand.
+        """
+        tally = jury_service.tally_for(db, case)
+        game_service.settle_case(db, case, kind)
+        if tally.total and tally.majority is None:
+            game_service.note_hung_jury(db, case)
+        elif tally.total:
+            judge_said = (
+                JuryVoteKind.guilty
+                if kind in {"guilty", "both_guilty"}
+                else JuryVoteKind.not_guilty
+            ).value
+            if tally.majority != judge_said:
+                game_service.note_overruled(db, case)
 
     def _mark_completed(self, db: Session, case: Case) -> None:
         db.execute(

@@ -7,11 +7,12 @@ import '../../../core/models.dart';
 import '../../../core/theme.dart';
 import '../../../core/widgets/court_icons.dart';
 import '../../../core/widgets/court_layout.dart';
-import '../../../core/widgets/court_people.dart';
+import '../../../core/widgets/sue_widgets.dart';
 import '../../../core/widgets/court_widgets.dart';
 import '../../courts/data/court_providers.dart';
 import '../../courts/presentation/courts_screen.dart' show courtMonogram;
 import '../../courts/presentation/user_search_sheet.dart';
+import '../../game/data/game_providers.dart';
 import '../data/case_providers.dart';
 
 /// Mirrors the server's limits so the user is corrected before a round trip.
@@ -46,6 +47,10 @@ class _CreateCaseScreenState extends ConsumerState<CreateCaseScreen> {
   String _category = CaseCategory.all.first.id;
   String? _courtId;
   UserRef? _accused;
+
+  /// How petty the plaintiff says it is, 1-3. Multiplies the XP the case pays
+  /// out if they win — and the XP they lose if they do not.
+  int _petty = 1;
   bool _submitting = false;
   String? _submitError;
 
@@ -115,6 +120,7 @@ class _CreateCaseScreenState extends ConsumerState<CreateCaseScreen> {
             defendantNickname: _accused?.displayName ?? _nickname.text.trim(),
             courtId: _courtId,
             accusedUserId: _accused?.userId,
+            pettyLevel: _petty,
           );
       if (!mounted) return;
       // The raw invite token exists only in this response, so go straight to
@@ -129,6 +135,22 @@ class _CreateCaseScreenState extends ConsumerState<CreateCaseScreen> {
     }
   }
 
+  /// Switching court drops an accused who is not in the new room: better than
+  /// filing against somebody who cannot be notified.
+  void _pickCourt(String? id) {
+    final courts = ref.read(courtsProvider).valueOrNull ?? const <Court>[];
+    setState(() {
+      _courtId = id;
+      if (_accused != null &&
+          !(courts
+              .where((c) => c.id == id)
+              .expand((c) => c.members)
+              .any((m) => m.userId == _accused!.userId))) {
+        _accused = null;
+      }
+    });
+  }
+
   @override
   Widget build(BuildContext context) {
     final remaining = CaseLimits.accusationMax - _accusation.text.trim().length;
@@ -136,231 +158,293 @@ class _CreateCaseScreenState extends ConsumerState<CreateCaseScreen> {
     final court = courts.where((c) => c.id == _courtId).firstOrNull;
     final candidates = court?.members ?? const <UserRef>[];
 
-    return CourtScaffold(
-      title: 'File a case',
-      header: ScreenHeader(
-        title: 'File a case',
-        titleSize: 28,
-        padding: const EdgeInsets.fromLTRB(16, 18, 16, 8),
-        leading: RoundIconButton(
-          glyph: CourtGlyph.close,
-          label: 'Close',
-          onTap: () => context.canPop() ? context.pop() : context.go('/'),
-        ),
-        trailing: [
-          _CourtPicker(
-            courts: courts,
-            selected: court,
-            onPick: (id) => setState(() {
-              _courtId = id;
-              // The accused came from the old court's roster; drop them rather
-              // than file against somebody who is not in the room.
-              if (_accused != null &&
-                  !(courts
-                      .where((c) => c.id == id)
-                      .expand((c) => c.members)
-                      .any((m) => m.userId == _accused!.userId))) {
-                _accused = null;
-              }
-            }),
-          ),
-        ],
+    // The three steps as groups, so the tablet artboard can set the first two
+    // beside the third instead of running all three down one column.
+    final accused = <Widget>[
+      // 1 — the accused.
+      // 1 — the accused.
+      const _Step(number: 1, title: 'Who are you suing?'),
+      const SizedBox(height: 10),
+      _AccusedPicker(
+        candidates: candidates,
+        accused: _accused,
+        onPick: (user) => setState(() {
+          _accused = user;
+          if (user != null) _nickname.clear();
+        }),
+        onSearch: () async {
+          final user = await pickUser(context, title: 'Who is the accused?');
+          if (user != null) {
+            setState(() {
+              _accused = user;
+              _nickname.clear();
+            });
+          }
+        },
       ),
-      bottom: BottomDock(
+      if (_accused == null) ...[
+        const SizedBox(height: 10),
+        TextFormField(
+          controller: _nickname,
+          maxLength: CaseLimits.nicknameMax,
+          textCapitalization: TextCapitalization.words,
+          onChanged: (_) => setState(() {}),
+          decoration: const InputDecoration(
+            labelText: 'Or just a nickname',
+            hintText: 'SliceBandit',
+            counterText: '',
+            helperText:
+                'Use the same name every time and their record follows '
+                'them from case to case.',
+            helperMaxLines: 2,
+          ),
+        ),
+      ],
+    ];
+
+    final charge = <Widget>[
+      // 2 — the charge.
+      _Step(
+        number: 2,
+        title: _accused == null && _nickname.text.trim().isEmpty
+            ? 'What did they do?'
+            : 'What did $_accusedName do?',
+      ),
+      const SizedBox(height: 10),
+      SueCard(
+        radius: 22,
+        padding: const EdgeInsets.fromLTRB(16, 14, 16, 12),
         child: Column(
-          mainAxisSize: MainAxisSize.min,
+          crossAxisAlignment: CrossAxisAlignment.start,
           children: [
-            if (_submitError != null) ...[
-              InlineError(_submitError!),
-              const SizedBox(height: 10),
-            ],
-            CourtKey(
-              // Only an account the court can notify earns a named key; a
-              // nickname is just a label, so the verb stays neutral.
-              label: _accused == null ? 'File the case' : 'Sue $_accusedName',
-              glyph: CourtGlyph.gavel,
-              height: 60,
-              busy: _submitting,
-              onPressed: _submitting ? null : _submit,
+            const _CardLabel('CASE TITLE'),
+            TextFormField(
+              controller: _title,
+              textCapitalization: TextCapitalization.sentences,
+              maxLength: CaseLimits.titleMax,
+              style: const TextStyle(fontWeight: FontWeight.w600, fontSize: 16),
+              decoration: const InputDecoration(
+                hintText: 'The Last Pizza Slice',
+                filled: false,
+                isDense: true,
+                counterText: '',
+                contentPadding: EdgeInsets.symmetric(vertical: 6),
+                border: InputBorder.none,
+                enabledBorder: InputBorder.none,
+                focusedBorder: InputBorder.none,
+              ),
+              validator: _validateTitle,
             ),
-            const SizedBox(height: 8),
-            Text(
-              _accused == null && _nickname.text.trim().isEmpty
-                  ? 'They get a window to mount a defense.'
-                  : '$_accusedName gets a window to mount a defense.',
-              textAlign: TextAlign.center,
-              maxLines: 2,
-              overflow: TextOverflow.ellipsis,
-              style: TextStyle(
-                fontSize: 12,
-                fontWeight: FontWeight.w800,
-                color: context.palette.inkDim,
+            Divider(color: context.palette.lineSoft, height: 12),
+            const SizedBox(height: 4),
+            const _CardLabel('THE CHARGE'),
+            TextFormField(
+              controller: _accusation,
+              maxLines: null,
+              minLines: 2,
+              maxLength: CaseLimits.accusationMax,
+              textCapitalization: TextCapitalization.sentences,
+              style: const TextStyle(
+                fontWeight: FontWeight.w500,
+                fontSize: 18,
+                height: 1.3,
+              ),
+              buildCounter:
+                  (
+                    _, {
+                    required currentLength,
+                    required isFocused,
+                    maxLength,
+                  }) => null,
+              decoration: const InputDecoration(
+                hintText: 'State the crime. Be dramatic.',
+                filled: false,
+                isDense: true,
+                contentPadding: EdgeInsets.only(top: 4),
+                border: InputBorder.none,
+                enabledBorder: InputBorder.none,
+                focusedBorder: InputBorder.none,
+              ),
+              validator: _validateAccusation,
+            ),
+            Align(
+              alignment: Alignment.centerRight,
+              child: Text(
+                '$remaining characters left',
+                style: TextStyle(
+                  fontSize: 11,
+                  fontWeight: FontWeight.w600,
+                  color: remaining < 0
+                      ? CourtColors.red
+                      : context.palette.inkDim,
+                ),
               ),
             ),
           ],
         ),
       ),
+      const SizedBox(height: 10),
+      Wrap(
+        spacing: 8,
+        runSpacing: 8,
+        children: [
+          for (final category in CaseCategory.all)
+            _ChoicePill(
+              label: category.label,
+              selected: _category == category.id,
+              onTap: () => setState(() => _category = category.id),
+            ),
+        ],
+      ),
+    ];
+
+    final petty = <Widget>[
+      // 3 — the stake.
+      const _Step(number: 3, title: 'How petty is it?'),
+      const SizedBox(height: 10),
+      _PettyPicker(
+        level: _petty,
+        onPick: (level) => setState(() => _petty = level),
+      ),
+    ];
+
+    final jury = <Widget>[
+      // 4 — the jury.
+      const _Step(number: 3, title: 'Who is on the jury?'),
+      const SizedBox(height: 10),
+      _JuryPicker(
+        courts: courts,
+        selected: _courtId,
+        onPick: (id) => setState(() => _courtId = id),
+      ),
+
+      const CourtDisclaimer(
+        text:
+            'Keep it harmless. The court will not make jokes about '
+            'anything serious — and neither should you.',
+      ),
+    ];
+
+    final dock = BottomDock(
+      child: Column(
+        mainAxisSize: MainAxisSize.min,
+        children: [
+          if (_submitError != null) ...[
+            InlineError(_submitError!),
+            const SizedBox(height: 10),
+          ],
+          _FilingKeyRow(
+            // Only an account the court can notify earns a named key; a
+            // nickname is just a label, so the verb stays neutral.
+            label: _accused == null ? 'File the case' : 'Sue $_accusedName',
+            busy: _submitting,
+            onPressed: _submitting ? null : _submit,
+          ),
+          const SizedBox(height: 8),
+          Text(
+            _accused == null && _nickname.text.trim().isEmpty
+                ? 'They get a window to mount a defense.'
+                : '$_accusedName gets a window to mount a defense.',
+            textAlign: TextAlign.center,
+            maxLines: 2,
+            overflow: TextOverflow.ellipsis,
+            style: TextStyle(
+              fontSize: 12,
+              fontWeight: FontWeight.w800,
+              color: context.palette.inkDim,
+            ),
+          ),
+        ],
+      ),
+    );
+
+    final close = RoundIconButton(
+      glyph: CourtGlyph.close,
+      label: 'Close',
+      onTap: () => context.canPop() ? context.pop() : context.go('/'),
+    );
+
+    final picker = _CourtPicker(
+      courts: courts,
+      selected: court,
+      onPick: _pickCourt,
+    );
+
+    return CourtScaffold(
+      title: 'File a case',
+      // The tablet artboard sets the accused and the charge beside the jury
+      // instead of running the three steps down one column.
+      tablet: Column(
+        children: [
+          Expanded(
+            child: SueTabletPage(
+              header: Row(
+                children: [
+                  close,
+                  const SizedBox(width: 14),
+                  Expanded(
+                    child: SueTabletHeader(
+                      title: 'File a case',
+                      subtitle: court?.name,
+                    ),
+                  ),
+                  picker,
+                ],
+              ),
+              child: Form(
+                key: _formKey,
+                child: ListView(
+                  padding: EdgeInsets.zero,
+                  children: [
+                    SueColumns(
+                      start: [
+                        Column(
+                          crossAxisAlignment: CrossAxisAlignment.stretch,
+                          mainAxisSize: MainAxisSize.min,
+                          children: [
+                            ...accused,
+                            const SizedBox(height: 18),
+                            ...charge,
+                          ],
+                        ),
+                      ],
+                      end: [
+                        Column(
+                          crossAxisAlignment: CrossAxisAlignment.stretch,
+                          mainAxisSize: MainAxisSize.min,
+                          children: jury,
+                        ),
+                      ],
+                    ),
+                  ],
+                ),
+              ),
+            ),
+          ),
+          dock,
+        ],
+      ),
+      header: ScreenHeader(
+        title: 'File a case',
+        titleSize: 28,
+        eyebrow: court == null ? null : 'IN ${court.name.toUpperCase()}',
+        padding: const EdgeInsets.fromLTRB(20, 18, 20, 8),
+        leading: close,
+        trailing: [picker],
+      ),
+      bottom: dock,
       body: Form(
         key: _formKey,
         child: ListView(
-          padding: const EdgeInsets.fromLTRB(16, 6, 16, 24),
+          padding: const EdgeInsets.fromLTRB(20, 6, 20, 24),
           children: [
-            // 1 — the accused.
-            const _Step(number: 1, title: 'Who are you suing?'),
-            const SizedBox(height: 10),
-            _AccusedPicker(
-              candidates: candidates,
-              accused: _accused,
-              onPick: (user) => setState(() {
-                _accused = user;
-                if (user != null) _nickname.clear();
-              }),
-              onSearch: () async {
-                final user = await pickUser(
-                  context,
-                  title: 'Who is the accused?',
-                );
-                if (user != null) {
-                  setState(() {
-                    _accused = user;
-                    _nickname.clear();
-                  });
-                }
-              },
-            ),
-            if (_accused == null) ...[
-              const SizedBox(height: 10),
-              TextFormField(
-                controller: _nickname,
-                maxLength: CaseLimits.nicknameMax,
-                textCapitalization: TextCapitalization.words,
-                onChanged: (_) => setState(() {}),
-                decoration: const InputDecoration(
-                  labelText: 'Or just a nickname',
-                  hintText: 'SliceBandit',
-                  counterText: '',
-                  helperText:
-                      'Use the same name every time and their record follows '
-                      'them from case to case.',
-                  helperMaxLines: 2,
-                ),
-              ),
-            ],
-
+            ...accused,
             const SizedBox(height: 18),
-            // 2 — the charge.
-            _Step(
-              number: 2,
-              title: _accused == null && _nickname.text.trim().isEmpty
-                  ? 'What did they do?'
-                  : 'What did $_accusedName do?',
-            ),
-            const SizedBox(height: 10),
-            Container(
-              decoration: courtChunk(context, radius: 22),
-              padding: const EdgeInsets.fromLTRB(14, 12, 14, 10),
-              child: Column(
-                crossAxisAlignment: CrossAxisAlignment.start,
-                children: [
-                  const _CardLabel('CASE TITLE'),
-                  TextFormField(
-                    controller: _title,
-                    textCapitalization: TextCapitalization.sentences,
-                    maxLength: CaseLimits.titleMax,
-                    style: const TextStyle(
-                      fontWeight: FontWeight.w900,
-                      fontSize: 16,
-                    ),
-                    decoration: const InputDecoration(
-                      hintText: 'The Last Pizza Slice',
-                      filled: false,
-                      isDense: true,
-                      counterText: '',
-                      contentPadding: EdgeInsets.symmetric(vertical: 6),
-                      border: InputBorder.none,
-                      enabledBorder: InputBorder.none,
-                      focusedBorder: InputBorder.none,
-                    ),
-                    validator: _validateTitle,
-                  ),
-                  Divider(color: context.palette.lineSoft, height: 12),
-                  const SizedBox(height: 4),
-                  const _CardLabel('THE CHARGE', color: CourtColors.redInk),
-                  TextFormField(
-                    controller: _accusation,
-                    maxLines: null,
-                    minLines: 2,
-                    maxLength: CaseLimits.accusationMax,
-                    textCapitalization: TextCapitalization.sentences,
-                    style: const TextStyle(
-                      fontFamily: courtDisplayFont,
-                      fontWeight: FontWeight.w600,
-                      fontSize: 20,
-                      height: 1.25,
-                    ),
-                    buildCounter:
-                        (
-                          _, {
-                          required currentLength,
-                          required isFocused,
-                          maxLength,
-                        }) => null,
-                    decoration: const InputDecoration(
-                      hintText: 'State the crime. Be dramatic.',
-                      filled: false,
-                      isDense: true,
-                      contentPadding: EdgeInsets.only(top: 4),
-                      border: InputBorder.none,
-                      enabledBorder: InputBorder.none,
-                      focusedBorder: InputBorder.none,
-                    ),
-                    validator: _validateAccusation,
-                  ),
-                  Align(
-                    alignment: Alignment.centerRight,
-                    child: Text(
-                      '$remaining characters left',
-                      style: TextStyle(
-                        fontSize: 11,
-                        fontWeight: FontWeight.w800,
-                        color: remaining < 0
-                            ? CourtColors.red
-                            : context.palette.inkDim,
-                      ),
-                    ),
-                  ),
-                ],
-              ),
-            ),
-            const SizedBox(height: 10),
-            Wrap(
-              spacing: 8,
-              runSpacing: 8,
-              children: [
-                for (final category in CaseCategory.all)
-                  _ChoicePill(
-                    label: '${category.emoji}  ${category.label}',
-                    selected: _category == category.id,
-                    onTap: () => setState(() => _category = category.id),
-                  ),
-              ],
-            ),
-
+            ...charge,
             const SizedBox(height: 18),
-            // 3 — the jury.
-            const _Step(number: 3, title: 'Who is on the jury?'),
-            const SizedBox(height: 10),
-            _JuryPicker(
-              courts: courts,
-              selected: _courtId,
-              onPick: (id) => setState(() => _courtId = id),
-            ),
-
-            const CourtDisclaimer(
-              text:
-                  'Keep it harmless. The court will not make jokes about '
-                  'anything serious — and neither should you.',
-            ),
+            ...petty,
+            const SizedBox(height: 18),
+            ...jury,
           ],
         ),
       ),
@@ -368,66 +452,42 @@ class _CreateCaseScreenState extends ConsumerState<CreateCaseScreen> {
   }
 }
 
-/// A numbered step heading: an ink disc and the question.
+/// A section label: small tracked capitals, as on the canvas. [number] is
+/// kept so the call sites still read as steps; it is not drawn.
 class _Step extends StatelessWidget {
+  // ignore: unused_element_parameter
   const _Step({required this.number, required this.title});
 
   final int number;
   final String title;
 
   @override
-  Widget build(BuildContext context) => Row(
-    children: [
-      Container(
-        width: 26,
-        height: 26,
-        alignment: Alignment.center,
-        decoration: BoxDecoration(
-          shape: BoxShape.circle,
-          color: context.colors.onSurface,
-        ),
-        child: Text(
-          '$number',
-          style: TextStyle(
-            fontSize: 14,
-            fontWeight: FontWeight.w900,
-            height: 1,
-            color: context.colors.surface,
-          ),
-        ),
-      ),
-      const SizedBox(width: 8),
-      Expanded(
-        child: Text(
-          title,
-          maxLines: 2,
-          overflow: TextOverflow.ellipsis,
-          style: const TextStyle(
-            fontFamily: courtDisplayFont,
-            fontWeight: FontWeight.w700,
-            fontSize: 19,
-            height: 1.15,
-          ),
-        ),
-      ),
-    ],
+  Widget build(BuildContext context) => Text(
+    title.toUpperCase(),
+    maxLines: 2,
+    overflow: TextOverflow.ellipsis,
+    style: TextStyle(
+      fontSize: 12,
+      fontWeight: FontWeight.w600,
+      letterSpacing: 1.5,
+      color: context.palette.inkDim,
+    ),
   );
 }
 
 class _CardLabel extends StatelessWidget {
-  const _CardLabel(this.text, {this.color});
+  const _CardLabel(this.text);
 
   final String text;
-  final Color? color;
 
   @override
   Widget build(BuildContext context) => Text(
     text,
     style: TextStyle(
       fontSize: 11,
-      fontWeight: FontWeight.w900,
+      fontWeight: FontWeight.w600,
       letterSpacing: 1.5,
-      color: color ?? context.palette.inkDim,
+      color: context.palette.inkDim,
     ),
   );
 }
@@ -448,40 +508,34 @@ class _ChoicePill extends StatelessWidget {
   Widget build(BuildContext context) => Semantics(
     button: true,
     selected: selected,
-    child: Material(
-      color: selected ? context.colors.onSurface : Colors.transparent,
-      borderRadius: BorderRadius.circular(courtRadiusPill),
-      clipBehavior: Clip.antiAlias,
-      child: InkWell(
-        onTap: onTap,
-        // No `alignment` on the Container: given one, it expands to every
-        // pixel the Wrap offers, and the pills stop being pills — each one
-        // takes a whole row. A min-size Row centres the label instead.
-        child: Container(
-          height: 36,
-          padding: const EdgeInsets.symmetric(horizontal: 12),
-          decoration: BoxDecoration(
-            borderRadius: BorderRadius.circular(courtRadiusPill),
-            border: Border.all(
-              color: context.palette.border,
-              width: courtBorderThin,
-            ),
-          ),
-          child: Row(
-            mainAxisSize: MainAxisSize.min,
-            children: [
-              Text(
-                label,
-                style: TextStyle(
-                  fontSize: 13,
-                  fontWeight: FontWeight.w800,
-                  color: selected
-                      ? context.colors.surface
-                      : context.colors.onSurface,
-                ),
+    child: GestureDetector(
+      behavior: HitTestBehavior.opaque,
+      onTap: onTap,
+      // No `alignment` on the Container: given one, it expands to every
+      // pixel the Wrap offers, and the pills stop being pills.
+      child: Container(
+        height: 38,
+        padding: const EdgeInsets.symmetric(horizontal: 14),
+        decoration: BoxDecoration(
+          color: selected
+              ? SueTone.blue.tint(context)
+              : context.palette.surfaceAlt,
+          borderRadius: BorderRadius.circular(999),
+        ),
+        child: Row(
+          mainAxisSize: MainAxisSize.min,
+          children: [
+            Text(
+              label,
+              style: TextStyle(
+                fontSize: 13,
+                fontWeight: FontWeight.w600,
+                color: selected
+                    ? SueTone.blue.fg(context)
+                    : context.palette.inkDim,
               ),
-            ],
-          ),
+            ),
+          ],
         ),
       ),
     ),
@@ -568,107 +622,57 @@ class _PersonTile extends StatelessWidget {
       button: true,
       selected: selected,
       label: name,
-      child: Stack(
-        clipBehavior: Clip.none,
-        children: [
-          Material(
-            color: selected
-                ? CourtColors.yellow
-                : context.colors.surfaceContainerHighest,
-            borderRadius: BorderRadius.circular(courtRadius),
-            clipBehavior: Clip.antiAlias,
-            child: InkWell(
-              onTap: onTap,
-              child: Container(
-                height: 92,
-                decoration: BoxDecoration(
-                  borderRadius: BorderRadius.circular(courtRadius),
-                  border: Border.all(
-                    color: selected ? palette.border : palette.lineSoft,
-                    width: courtBorderWidth,
-                  ),
-                  boxShadow: selected ? courtHardShadow(context) : null,
-                ),
-                child: Column(
-                  mainAxisAlignment: MainAxisAlignment.center,
-                  children: [
-                    Container(
-                      width: 46,
-                      height: 46,
+      child: GestureDetector(
+        behavior: HitTestBehavior.opaque,
+        onTap: onTap,
+        child: Container(
+          height: 92,
+          decoration: BoxDecoration(
+            color: context.colors.surfaceContainerHighest,
+            borderRadius: BorderRadius.circular(18),
+            border: Border.all(
+              color: selected ? palette.accent : Colors.transparent,
+              width: 2,
+            ),
+            boxShadow: courtHardShadow(context, dy: 4),
+          ),
+          child: Column(
+            mainAxisAlignment: MainAxisAlignment.center,
+            children: [
+              glyph != null
+                  ? Container(
+                      width: 44,
+                      height: 44,
                       alignment: Alignment.center,
                       decoration: BoxDecoration(
                         shape: BoxShape.circle,
-                        color: glyph != null
-                            ? palette.surfaceAlt
-                            : tintFor(name),
-                        border: Border.all(
-                          color: palette.border,
-                          width: courtBorderWidth,
-                        ),
+                        color: palette.surfaceAlt,
                       ),
-                      child: glyph != null
-                          ? CourtIcon(
-                              glyph!,
-                              size: 20,
-                              color: context.colors.onSurface,
-                              strokeWidth: 3,
-                            )
-                          : Text(
-                              name.trim().isEmpty
-                                  ? '?'
-                                  : name.trim()[0].toUpperCase(),
-                              style: const TextStyle(
-                                fontFamily: courtDisplayFont,
-                                fontWeight: FontWeight.w700,
-                                fontSize: 20,
-                                height: 1,
-                                color: CourtColors.lightInk,
-                              ),
-                            ),
-                    ),
-                    const SizedBox(height: 6),
-                    Padding(
-                      padding: const EdgeInsets.symmetric(horizontal: 4),
-                      child: Text(
-                        name,
-                        maxLines: 1,
-                        overflow: TextOverflow.ellipsis,
-                        style: TextStyle(
-                          fontSize: 13,
-                          fontWeight: FontWeight.w900,
-                          color: selected
-                              ? CourtColors.lightInk
-                              : context.colors.onSurface,
-                        ),
+                      child: CourtIcon(
+                        glyph!,
+                        size: 20,
+                        color: palette.accent,
+                        strokeWidth: 2.6,
                       ),
-                    ),
-                  ],
+                    )
+                  : SueAvatar(name: name, size: 44),
+              const SizedBox(height: 6),
+              Padding(
+                padding: const EdgeInsets.symmetric(horizontal: 4),
+                child: Text(
+                  name,
+                  maxLines: 1,
+                  overflow: TextOverflow.ellipsis,
+                  style: TextStyle(
+                    fontSize: 13,
+                    fontWeight: selected ? FontWeight.w600 : FontWeight.w400,
+                    color: context.colors.onSurface,
+                  ),
                 ),
               ),
-            ),
+            ],
           ),
-          if (selected)
-            Positioned(
-              top: -8,
-              right: -6,
-              child: Container(
-                width: 24,
-                height: 24,
-                alignment: Alignment.center,
-                decoration: BoxDecoration(
-                  shape: BoxShape.circle,
-                  color: CourtColors.red,
-                  border: Border.all(color: CourtColors.lightInk, width: 2),
-                ),
-                child: const CourtIcon(
-                  CourtGlyph.check,
-                  size: 12,
-                  color: Colors.white,
-                  strokeWidth: 4,
-                ),
-              ),
-            ),
-        ],
+        ),
       ),
     );
   }
@@ -744,67 +748,54 @@ class _JuryTile extends StatelessWidget {
     return Semantics(
       button: true,
       selected: selected,
-      child: Material(
-        color: selected
-            ? CourtColors.orange
-            : context.colors.surfaceContainerHighest,
-        borderRadius: BorderRadius.circular(courtRadius),
-        clipBehavior: Clip.antiAlias,
-        child: InkWell(
-          onTap: onTap,
-          child: Container(
-            height: 84,
-            padding: const EdgeInsets.symmetric(horizontal: 10),
-            decoration: BoxDecoration(
-              borderRadius: BorderRadius.circular(courtRadius),
-              border: Border.all(
-                color: palette.border,
-                width: courtBorderWidth,
+      child: GestureDetector(
+        behavior: HitTestBehavior.opaque,
+        onTap: onTap,
+        child: Container(
+          height: 84,
+          padding: const EdgeInsets.symmetric(horizontal: 12),
+          decoration: BoxDecoration(
+            color: selected
+                ? SueTone.blue.tint(context)
+                : context.colors.surfaceContainerHighest,
+            borderRadius: BorderRadius.circular(18),
+            border: Border.all(
+              color: selected ? palette.accent : Colors.transparent,
+              width: 2,
+            ),
+            boxShadow: courtHardShadow(context, dy: 4),
+          ),
+          child: Column(
+            mainAxisAlignment: MainAxisAlignment.center,
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+              if (monogram != null)
+                Text(
+                  monogram!,
+                  style: TextStyle(
+                    fontSize: 12,
+                    fontWeight: FontWeight.w700,
+                    letterSpacing: .5,
+                    color: selected ? palette.accent : palette.inkDim,
+                  ),
+                ),
+              Text(
+                title,
+                maxLines: 2,
+                overflow: TextOverflow.ellipsis,
+                style: const TextStyle(
+                  fontWeight: FontWeight.w600,
+                  fontSize: 14,
+                  height: 1.15,
+                ),
               ),
-              boxShadow: selected ? courtHardShadow(context) : null,
-            ),
-            child: Column(
-              mainAxisAlignment: MainAxisAlignment.center,
-              crossAxisAlignment: CrossAxisAlignment.start,
-              children: [
-                if (monogram != null)
-                  Text(
-                    monogram!,
-                    style: TextStyle(
-                      fontFamily: courtDisplayFont,
-                      fontWeight: FontWeight.w700,
-                      fontSize: 16,
-                      height: 1,
-                      color: selected ? CourtColors.lightInk : palette.inkDim,
-                    ),
-                  ),
-                Text(
-                  title,
-                  maxLines: 2,
-                  overflow: TextOverflow.ellipsis,
-                  style: TextStyle(
-                    fontWeight: FontWeight.w900,
-                    fontSize: 14,
-                    height: 1.15,
-                    color: selected
-                        ? CourtColors.lightInk
-                        : context.colors.onSurface,
-                  ),
-                ),
-                Text(
-                  caption,
-                  maxLines: 1,
-                  overflow: TextOverflow.ellipsis,
-                  style: TextStyle(
-                    fontSize: 11,
-                    fontWeight: FontWeight.w800,
-                    color: selected
-                        ? CourtColors.lightInk.withValues(alpha: 0.75)
-                        : palette.inkDim,
-                  ),
-                ),
-              ],
-            ),
+              Text(
+                caption,
+                maxLines: 1,
+                overflow: TextOverflow.ellipsis,
+                style: TextStyle(fontSize: 11, color: palette.inkDim),
+              ),
+            ],
           ),
         ),
       ),
@@ -839,37 +830,219 @@ class _CourtPicker extends StatelessWidget {
       constraints: const BoxConstraints(maxWidth: 150),
       padding: const EdgeInsets.symmetric(horizontal: 12),
       decoration: BoxDecoration(
-        color: CourtColors.yellow,
-        borderRadius: BorderRadius.circular(courtRadiusPill),
-        border: Border.all(
-          color: context.palette.border,
-          width: courtBorderWidth,
-        ),
+        color: context.colors.surfaceContainerHighest,
+        borderRadius: BorderRadius.circular(999),
+        boxShadow: courtHardShadow(context, dy: 4),
       ),
       child: Row(
         mainAxisSize: MainAxisSize.min,
         children: [
+          Container(
+            width: 8,
+            height: 8,
+            decoration: BoxDecoration(
+              color: SueTone.teal.fg(context),
+              shape: BoxShape.circle,
+            ),
+          ),
+          const SizedBox(width: 6),
           Flexible(
             child: Text(
               selected?.name ?? 'No court',
               maxLines: 1,
               overflow: TextOverflow.ellipsis,
-              style: const TextStyle(
-                fontWeight: FontWeight.w900,
-                fontSize: 13,
-                color: CourtColors.lightInk,
-              ),
+              style: const TextStyle(fontWeight: FontWeight.w600, fontSize: 13),
             ),
           ),
           const SizedBox(width: 6),
-          const CourtIcon(
-            CourtGlyph.chevronDown,
-            size: 14,
-            color: CourtColors.lightInk,
-            strokeWidth: 3.4,
-          ),
+          const CourtIcon(CourtGlyph.chevronDown, size: 12, strokeWidth: 3),
         ],
       ),
     ),
   );
+}
+
+/// "HOW PETTY IS IT?" — the plaintiff's own stake on the case.
+///
+/// A multiplier, not a label: claiming a bin-day dispute is world-ending pays
+/// three times as much when the court agrees, and costs three times as much
+/// when it does not.
+class _PettyPicker extends StatelessWidget {
+  const _PettyPicker({required this.level, required this.onPick});
+
+  final int level;
+  final ValueChanged<int> onPick;
+
+  static const _levels = [
+    (1, 'Mildly annoyed', '×1 XP'),
+    (2, 'Genuinely upset', '×2 XP'),
+    (3, 'This is war', '×3 XP'),
+  ];
+
+  @override
+  Widget build(BuildContext context) => Row(
+    children: [
+      for (final (value, label, multiplier) in _levels) ...[
+        if (value > 1) const SizedBox(width: 10),
+        Expanded(
+          child: _PettyTile(
+            value: value,
+            label: label,
+            multiplier: multiplier,
+            selected: value == level,
+            onTap: () => onPick(value),
+          ),
+        ),
+      ],
+    ],
+  );
+}
+
+class _PettyTile extends StatelessWidget {
+  const _PettyTile({
+    required this.value,
+    required this.label,
+    required this.multiplier,
+    required this.selected,
+    required this.onTap,
+  });
+
+  final int value;
+  final String label;
+  final String multiplier;
+  final bool selected;
+  final VoidCallback onTap;
+
+  @override
+  Widget build(BuildContext context) {
+    final tone = switch (value) {
+      1 => SueTone.teal,
+      2 => SueTone.gold,
+      _ => SueTone.orange,
+    };
+    final colour = tone.fg(context);
+    return Semantics(
+      button: true,
+      selected: selected,
+      label: '$label, $multiplier',
+      child: InkWell(
+        borderRadius: BorderRadius.circular(16),
+        onTap: onTap,
+        child: Container(
+          padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 12),
+          decoration: BoxDecoration(
+            color: selected
+                ? tone.tint(context)
+                : context.colors.surfaceContainerHighest,
+            borderRadius: BorderRadius.circular(16),
+            border: Border.all(
+              color: selected ? colour : Colors.transparent,
+              width: selected ? 2 : courtBorderThin,
+            ),
+            boxShadow: selected ? null : courtHardShadow(context, dy: 4),
+          ),
+          child: Column(
+            mainAxisSize: MainAxisSize.min,
+            children: [
+              // One flame per level: the row reads as a scale before it reads
+              // as words.
+              Row(
+                mainAxisAlignment: MainAxisAlignment.center,
+                children: [
+                  for (var i = 0; i < value; i++)
+                    CourtIcon(
+                      CourtGlyph.flame,
+                      size: 14,
+                      color: selected ? colour : context.palette.inkFaint,
+                    ),
+                ],
+              ),
+              const SizedBox(height: 6),
+              Text(
+                label,
+                maxLines: 2,
+                textAlign: TextAlign.center,
+                overflow: TextOverflow.ellipsis,
+                style: TextStyle(
+                  fontSize: 12,
+                  height: 1.2,
+                  fontWeight: selected ? FontWeight.w700 : FontWeight.w500,
+                  color: selected ? colour : context.colors.onSurface,
+                ),
+              ),
+              const SizedBox(height: 2),
+              Text(
+                multiplier,
+                style: TextStyle(
+                  fontSize: 11,
+                  fontWeight: FontWeight.w800,
+                  color: selected ? colour : context.palette.inkDim,
+                ),
+              ),
+            ],
+          ),
+        ),
+      ),
+    );
+  }
+}
+
+/// The filing key, with the price on it.
+///
+/// The cost is the player's own balance read back from the server, so the key
+/// can say plainly when it cannot be pressed rather than failing on tap.
+class _FilingKeyRow extends ConsumerWidget {
+  const _FilingKeyRow({
+    required this.label,
+    required this.busy,
+    required this.onPressed,
+  });
+
+  final String label;
+  final bool busy;
+  final VoidCallback? onPressed;
+
+  /// Kept in step with the server's own filing fee.
+  static const cost = 10;
+
+  @override
+  Widget build(BuildContext context, WidgetRef ref) {
+    final coins = ref.watch(gameStateProvider).valueOrNull?.player.coins;
+    final broke = coins != null && coins < cost;
+
+    return Column(
+      crossAxisAlignment: CrossAxisAlignment.stretch,
+      children: [
+        SueButton(
+          label: label.toUpperCase(),
+          height: 56,
+          busy: busy,
+          onPressed: broke ? null : onPressed,
+        ),
+        const SizedBox(height: 8),
+        Row(
+          mainAxisAlignment: MainAxisAlignment.center,
+          children: [
+            const SueCoin(size: 16),
+            const SizedBox(width: 6),
+            Flexible(
+              child: Text(
+                broke
+                    ? 'Filing costs $cost coins — you have $coins'
+                    : 'Filing costs $cost coins'
+                          '${coins == null ? '' : ' · you have $coins'}',
+                maxLines: 1,
+                overflow: TextOverflow.ellipsis,
+                style: TextStyle(
+                  fontSize: 12,
+                  fontWeight: FontWeight.w700,
+                  color: broke ? CourtColors.red : context.palette.inkDim,
+                ),
+              ),
+            ),
+          ],
+        ),
+      ],
+    );
+  }
 }

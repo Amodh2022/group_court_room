@@ -4,19 +4,20 @@ import 'package:go_router/go_router.dart';
 
 import '../theme.dart';
 import 'court_chrome.dart';
-import 'court_icons.dart';
+import 'sue_tablet.dart';
 
 // The nav pill, the stage panel and the header row live in court_chrome.dart.
 // Re-exported so the screens keep one import for "the shell".
 export 'court_chrome.dart';
+export 'sue_tablet.dart';
 
 /// Widest a column of content gets. Past this the screen centres it.
 const courtContentWidth = 720.0;
 
 /// Breakpoints. Below [courtRailBreakpoint] the nav floats at the bottom; from
-/// there up it becomes a rail down the side. From [courtWideBreakpoint] lists
-/// become two columns.
-const courtRailBreakpoint = 600.0;
+/// there up it becomes the canvas's 104px rail. From [courtWideBreakpoint]
+/// lists become two columns.
+const courtRailBreakpoint = sueTabletBreakpoint;
 const courtWideBreakpoint = 840.0;
 
 /// The soft grey canvas behind every screen. With [hero] it adds the pastel
@@ -45,12 +46,12 @@ class CourtBackground extends StatelessWidget {
                   gradient: LinearGradient(
                     begin: Alignment.topLeft,
                     end: Alignment.bottomRight,
+                    // A quiet blue wash that fades into the page; the canvas
+                    // has no sign-in screen, so it borrows its one accent.
                     colors: [
-                      CourtColors.heroBlue.withValues(alpha: dark ? 0.5 : 0.9),
-                      CourtColors.heroPink.withValues(alpha: dark ? 0.5 : 0.85),
-                      CourtColors.heroViolet.withValues(
-                        alpha: dark ? 0.4 : 0.55,
-                      ),
+                      CourtColors.blue.withValues(alpha: dark ? 0.28 : 0.16),
+                      CourtColors.blue.withValues(alpha: dark ? 0.14 : 0.07),
+                      base.withValues(alpha: 0),
                       base.withValues(alpha: 0),
                     ],
                     stops: const [0, 0.35, 0.7, 1],
@@ -241,13 +242,13 @@ class CourtShell extends StatelessWidget {
               ? null
               : SafeArea(
                   top: false,
-                  minimum: const EdgeInsets.only(bottom: 18),
+                  minimum: EdgeInsets.zero,
                   child: CourtNavBar(current: current, onSelect: go),
                 ),
           body: rail
               ? Row(
                   children: [
-                    _Rail(current: current, onSelect: go),
+                    SueNavRail(current: current, onSelect: go),
                     Expanded(child: navigationShell),
                   ],
                 )
@@ -280,6 +281,7 @@ class CourtScaffold extends StatelessWidget {
     this.automaticallyImplyLeading = true,
     this.hero = false,
     this.maxWidth = courtContentWidth,
+    this.tablet,
   });
 
   final String title;
@@ -299,8 +301,17 @@ class CourtScaffold extends StatelessWidget {
   final bool hero;
   final double maxWidth;
 
+  /// The screen as the canvas's tablet artboard draws it: its own 28px page,
+  /// its own loud title row, its own columns. Used whole — [header], [body]
+  /// and [bottom] are the phone frame and stand down — from
+  /// [sueTabletBreakpoint] up. A screen that has no tablet artboard leaves
+  /// this null and keeps the phone layout, centred, at any width.
+  final Widget? tablet;
+
   @override
   Widget build(BuildContext context) {
+    final wide = tablet != null && context.isTablet;
+
     final column = Column(
       crossAxisAlignment: CrossAxisAlignment.stretch,
       children: [
@@ -310,19 +321,21 @@ class CourtScaffold extends StatelessWidget {
       ],
     );
 
-    final content = Align(
-      alignment: Alignment.topCenter,
-      child: ConstrainedBox(
-        constraints: BoxConstraints(maxWidth: maxWidth),
-        child: column,
-      ),
-    );
+    final content = wide
+        ? tablet!
+        : Align(
+            alignment: Alignment.topCenter,
+            child: ConstrainedBox(
+              constraints: BoxConstraints(maxWidth: maxWidth),
+              child: column,
+            ),
+          );
 
     return CourtBackground(
       hero: hero,
       child: Scaffold(
         backgroundColor: Colors.transparent,
-        appBar: header != null
+        appBar: header != null || wide
             ? null
             : AppBar(
                 title: Text(title),
@@ -331,124 +344,12 @@ class CourtScaffold extends StatelessWidget {
                 automaticallyImplyLeading: automaticallyImplyLeading,
               ),
         floatingActionButton: floatingActionButton,
-        body: SafeArea(bottom: bottom == null, child: content),
+        // The tablet page lays out its own safe area so a side panel can run
+        // to the edge of the glass.
+        body: wide ? content : SafeArea(bottom: bottom == null, child: content),
       ),
     );
   }
-}
-
-/// The same five slots as the pill, stood on end for a wide window.
-class _Rail extends StatelessWidget {
-  const _Rail({required this.current, required this.onSelect});
-
-  final CourtTab current;
-  final ValueChanged<int> onSelect;
-
-  @override
-  Widget build(BuildContext context) => Padding(
-    padding: const EdgeInsets.fromLTRB(12, 12, 4, 12),
-    child: Material(
-      type: MaterialType.transparency,
-      child: Container(
-        width: 84,
-        padding: const EdgeInsets.symmetric(vertical: 10),
-        decoration: BoxDecoration(
-          color: context.palette.nav,
-          borderRadius: BorderRadius.circular(courtRadiusPill),
-          border: Border.all(
-            color: context.palette.border,
-            width: courtBorderWidth,
-          ),
-          boxShadow: courtHardShadow(context),
-        ),
-        // Scrollable: in a short landscape window five slots are taller than
-        // the rail, and a nav bar is never a reason to drop a frame.
-        child: SingleChildScrollView(
-          child: Column(
-            mainAxisSize: MainAxisSize.min,
-            children: [
-              for (final tab in CourtTab.values) ...[
-                Padding(
-                  padding: const EdgeInsets.symmetric(vertical: 2),
-                  child: Semantics(
-                    button: true,
-                    selected: tab == current,
-                    label: tab.label,
-                    child: Tooltip(
-                      message: tab.label,
-                      child: InkWell(
-                        customBorder: const CircleBorder(),
-                        onTap: () => onSelect(tab.index),
-                        child: Container(
-                          width: 48,
-                          height: 48,
-                          alignment: Alignment.center,
-                          decoration: BoxDecoration(
-                            shape: BoxShape.circle,
-                            color: tab == current
-                                ? CourtColors.yellow
-                                : Colors.transparent,
-                          ),
-                          child: CourtIcon(
-                            tab.glyph,
-                            size: 24,
-                            color: tab == current
-                                ? CourtColors.lightInk
-                                : CourtColors.stageDim,
-                          ),
-                        ),
-                      ),
-                    ),
-                  ),
-                ),
-                // The filing key sits between Courts and the rap sheet here too,
-                // so the order matches the pill exactly.
-                if (tab == CourtTab.courts)
-                  Padding(
-                    padding: const EdgeInsets.symmetric(vertical: 4),
-                    child: Semantics(
-                      button: true,
-                      label: 'File a case',
-                      child: Tooltip(
-                        message: 'File a case',
-                        child: InkWell(
-                          customBorder: const CircleBorder(),
-                          onTap: () => context.push('/cases/new'),
-                          child: Container(
-                            width: 56,
-                            height: 56,
-                            alignment: Alignment.center,
-                            decoration: BoxDecoration(
-                              shape: BoxShape.circle,
-                              color: CourtColors.violet,
-                              border: Border.all(
-                                color: context.palette.border,
-                                width: courtBorderWidth,
-                              ),
-                              boxShadow: const [
-                                BoxShadow(
-                                  color: CourtColors.violetInk,
-                                  offset: Offset(0, 4),
-                                ),
-                              ],
-                            ),
-                            child: const CourtIcon(
-                              CourtGlyph.gavel,
-                              size: 26,
-                              color: Colors.white,
-                            ),
-                          ),
-                        ),
-                      ),
-                    ),
-                  ),
-              ],
-            ],
-          ),
-        ),
-      ),
-    ),
-  );
 }
 
 /// A big display heading inside the body, in the court's voice.

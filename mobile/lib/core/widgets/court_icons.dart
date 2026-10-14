@@ -29,6 +29,7 @@ enum CourtGlyph {
   key,
   trash,
   refresh,
+
   /// Solid, not stroked — the petty-level flame.
   flame,
 }
@@ -87,7 +88,9 @@ class _GlyphPainter extends CustomPainter {
     // Every path below is authored on the design's own grid, then scaled to
     // whatever box the caller asked for. Stroke width is scaled with it, so an
     // icon keeps its weight at any size.
-    final grid = glyph == CourtGlyph.flame ? const Size(18, 22) : const Size(24, 24);
+    final grid = glyph == CourtGlyph.flame
+        ? const Size(18, 22)
+        : const Size(24, 24);
     final scale = size.width / grid.width;
     canvas.save();
     canvas.scale(scale);
@@ -203,8 +206,11 @@ class _GlyphPainter extends CustomPainter {
           clockwise: false,
         );
         p.lineTo(17, 21);
-        p.arcToPoint(const Offset(19, 19), radius: const Radius.circular(2),
-            clockwise: false);
+        p.arcToPoint(
+          const Offset(19, 19),
+          radius: const Radius.circular(2),
+          clockwise: false,
+        );
         p.lineTo(19, 14);
       case CourtGlyph.back:
         p.moveTo(15, 18);
@@ -247,9 +253,7 @@ class _GlyphPainter extends CustomPainter {
         p.moveTo(9, 2);
         p.lineTo(15, 2);
       case CourtGlyph.doc:
-        p.addRRect(
-          RRect.fromLTRBR(6, 3, 18, 21, const Radius.circular(1.5)),
-        );
+        p.addRRect(RRect.fromLTRBR(6, 3, 18, 21, const Radius.circular(1.5)));
         p.moveTo(9, 8);
         p.lineTo(15, 8);
         p.moveTo(9, 12);

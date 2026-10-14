@@ -144,6 +144,7 @@ class ApiClient {
     String? defendantNickname,
     String? courtId,
     String? accusedUserId,
+    int pettyLevel = 1,
   }) => _send(
     () => _dio.post(
       '/api/v1/cases',
@@ -156,6 +157,7 @@ class ApiClient {
           'defendant_nickname': defendantNickname,
         if (courtId != null) 'court_id': courtId,
         if (accusedUserId != null) 'accused_user_id': accusedUserId,
+        'petty_level': pettyLevel,
       },
     ),
     (data) => CaseDetail.fromJson(data as Map<String, dynamic>),
@@ -324,4 +326,41 @@ class ApiClient {
         ),
         (_) {},
       );
+
+  // --- the game ------------------------------------------------------------
+
+  /// The player's own state. Reading it is also what records the daily streak
+  /// and opens the day's quests, so the app calls it on launch.
+  Future<GameState> gameState() => _send(
+    () => _dio.get('/api/v1/me/game', options: _options),
+    (data) => GameState.fromJson(data as Map<String, dynamic>),
+  );
+
+  /// What one case paid this player.
+  Future<CaseRewards> caseRewards(String caseId) => _send(
+    () => _dio.get('/api/v1/me/rewards/$caseId', options: _options),
+    (data) => CaseRewards.fromJson(data as Map<String, dynamic>),
+  );
+
+  // --- answering a summons -------------------------------------------------
+
+  /// The charge, for whoever holds this summons. Unauthenticated on purpose:
+  /// the token is the whole capability, so somebody without an account can
+  /// still answer.
+  Future<InvitePreview> invitePreview(String token) => _send(
+    () => _dio.get('/api/v1/invites/$token'),
+    (data) => InvitePreview.fromJson(data as Map<String, dynamic>),
+  );
+
+  Future<DefenseAccepted> submitDefense(
+    String token, {
+    required String nickname,
+    required String body,
+  }) => _send(
+    () => _dio.post(
+      '/api/v1/invites/$token/defense',
+      data: {'nickname': nickname, 'body': body},
+    ),
+    (data) => DefenseAccepted.fromJson(data as Map<String, dynamic>),
+  );
 }

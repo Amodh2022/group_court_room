@@ -21,7 +21,6 @@ void main() {
     );
   }
 
-
   /// The form's fields are addressed by what they say, not by their position:
   /// the canvas puts "who are you suing" above the charge, so an index would
   /// silently point at a different box every time the layout moves.
@@ -41,7 +40,7 @@ void main() {
       tester,
     ) async {
       await pump(tester);
-      await tester.tap(find.text('File the case'));
+      await tester.tap(find.text('FILE THE CASE'));
       await tester.pumpAndSettle();
 
       expect(find.textContaining('Give the case a name'), findsOneWidget);
@@ -52,7 +51,7 @@ void main() {
     testWidgets('rejects a title that is too short', (tester) async {
       await pump(tester);
       await tester.enterText(titleField, 'ab');
-      await tester.tap(find.text('File the case'));
+      await tester.tap(find.text('FILE THE CASE'));
       await tester.pumpAndSettle();
 
       expect(find.textContaining('at least 3 characters'), findsOneWidget);
@@ -61,12 +60,9 @@ void main() {
 
     testWidgets('rejects an accusation that is too short', (tester) async {
       await pump(tester);
-      await tester.enterText(
-        titleField,
-        'The Last Pizza Slice',
-      );
+      await tester.enterText(titleField, 'The Last Pizza Slice');
       await tester.enterText(chargeField, 'too short');
-      await tester.tap(find.text('File the case'));
+      await tester.tap(find.text('FILE THE CASE'));
       await tester.pumpAndSettle();
 
       expect(find.textContaining('at least 10 characters'), findsOneWidget);
@@ -77,19 +73,16 @@ void main() {
       tester,
     ) async {
       await pump(tester);
-      await tester.enterText(
-        titleField,
-        '  The Last Pizza Slice  ',
-      );
+      await tester.enterText(titleField, '  The Last Pizza Slice  ');
       await tester.enterText(
         chargeField,
         '  They ate the last slice right after saying they were full.  ',
       );
       await tester.enterText(nicknameField, 'SliceBandit');
 
-      await tester.tap(find.text('💬  Group chat'));
+      await tester.tap(find.text('Group chat'));
       await tester.pumpAndSettle();
-      await tester.tap(find.text('File the case'));
+      await tester.tap(find.text('FILE THE CASE'));
       await tester.pumpAndSettle();
 
       expect(api.lastCreate, {
@@ -100,6 +93,8 @@ void main() {
         'defendant_nickname': 'SliceBandit',
         'court_id': null,
         'accused_user_id': null,
+        // Filing without choosing a level is the mildest one, not a bet.
+        'petty_level': 1,
       });
     });
 
@@ -126,15 +121,12 @@ void main() {
       );
       await pump(tester);
 
-      await tester.enterText(
-        titleField,
-        'The Last Pizza Slice',
-      );
+      await tester.enterText(titleField, 'The Last Pizza Slice');
       await tester.enterText(
         chargeField,
         'They ate the last slice after saying they were full.',
       );
-      await tester.tap(find.text('File the case'));
+      await tester.tap(find.text('FILE THE CASE'));
       await tester.pumpAndSettle();
 
       expect(find.text('You have too many open cases.'), findsOneWidget);
@@ -150,15 +142,12 @@ void main() {
       );
       await pump(tester);
 
-      await tester.enterText(
-        titleField,
-        'The Last Pizza Slice',
-      );
+      await tester.enterText(titleField, 'The Last Pizza Slice');
       await tester.enterText(
         chargeField,
         'They ate the last slice after saying they were full.',
       );
-      await tester.tap(find.text('File the case'));
+      await tester.tap(find.text('FILE THE CASE'));
       await tester.pumpAndSettle();
 
       expect(
@@ -167,10 +156,7 @@ void main() {
       );
       // The typed title survives the failure, so a retry costs no re-typing.
       final title = tester.widget<TextField>(
-        find.descendant(
-          of: titleField,
-          matching: find.byType(TextField),
-        ),
+        find.descendant(of: titleField, matching: find.byType(TextField)),
       );
       expect(title.controller?.text, 'The Last Pizza Slice');
     });
@@ -179,16 +165,13 @@ void main() {
       tester,
     ) async {
       await pump(tester);
-      await tester.enterText(
-        titleField,
-        'The Last Pizza Slice',
-      );
+      await tester.enterText(titleField, 'The Last Pizza Slice');
       await tester.enterText(
         chargeField,
         'They ate the last slice after saying they were full.',
       );
 
-      await tester.tap(find.text('File the case'));
+      await tester.tap(find.text('FILE THE CASE'));
       await tester.pump(); // submitting, not yet resolved
 
       expect(find.byType(CircularProgressIndicator), findsOneWidget);

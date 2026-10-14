@@ -79,9 +79,7 @@ void main() {
     expect(key.bottom, lessThanOrEqualTo(bar.bottom));
   });
 
-  testWidgets('the filing key answers a tap where it is drawn', (
-    tester,
-  ) async {
+  testWidgets('the filing key answers a tap where it is drawn', (tester) async {
     final router = await pumpApp(tester, phone);
     // Tap the gavel itself, not the slot's bounding box. The key is painted
     // 34px above its slot, and with the Transform inside the InkWell those
@@ -215,8 +213,10 @@ void main() {
     await pumpApp(tester, const Size(1000, 800));
     expect(find.byType(CourtNavBar), findsNothing);
     expect(find.byTooltip(CourtTab.courts.label), findsOneWidget);
-    expect(tester.getCenter(find.byTooltip(CourtTab.courts.label)).dx,
-        lessThan(120));
+    expect(
+      tester.getCenter(find.byTooltip(CourtTab.courts.label)).dx,
+      lessThan(120),
+    );
   });
 
   testWidgets('switching tabs does not stack a second bar', (tester) async {

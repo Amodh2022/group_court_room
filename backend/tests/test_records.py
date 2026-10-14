@@ -201,3 +201,28 @@ def test_rap_sheet_is_scoped_to_the_caller(client, make_case, db, auth_headers):
 
 def test_rap_sheet_needs_a_credential(client):
     assert client.get("/api/v1/cases/rap-sheet").status_code in (401, 403)
+
+
+def test_rap_sheet_marks_the_callers_own_row(client, make_case, db, auth_headers):
+    """A row carries a record id, not an account id, so the server says which
+    one is you. Without it the client cannot draw "where you stand"."""
+    headers = auth_headers(name="Alex")
+    case, _ = make_case(headers, defendant_nickname="Sam")
+    _rule(db, case["id"], "both_guilty")
+
+    sheet = client.get("/api/v1/cases/rap-sheet", headers=headers).json()
+    mine = [entry["display_name"] for entry in sheet if entry["is_you"]]
+    assert mine == ["Alex"]
+
+
+def test_rap_sheet_marks_nobody_in_someone_elses_court(
+    client, make_case, db, auth_headers
+):
+    mine = auth_headers(name="Alex")
+    case, _ = make_case(mine, defendant_nickname="Jordan")
+    _rule(db, case["id"], "both_guilty")
+
+    # Jordan has a record in Alex's court, but reads their own court, which is
+    # empty. The flag is never set on a name that merely matches.
+    sheet = client.get("/api/v1/cases/rap-sheet", headers=mine).json()
+    assert [e["is_you"] for e in sheet if e["display_name"] == "Jordan"] == [False]

@@ -107,7 +107,13 @@ def tally_for(db: Session, case: Case) -> Tally:
 
 
 def cast_vote(
-    db: Session, *, case: Case, voter_key: str, juror_name: str | None, vote: str
+    db: Session,
+    *,
+    case: Case,
+    voter_key: str,
+    juror_name: str | None,
+    vote: str,
+    juror_user_id: uuid.UUID | None = None,
 ) -> JuryVote:
     """Seat a juror and record their ballot. One ballot per juror, forever.
 
@@ -132,6 +138,7 @@ def cast_vote(
         case_id=case.id,
         voter_key=voter_hash(voter_key),
         juror_name=(juror_name or None),
+        juror_user_id=juror_user_id,
         vote=vote,
     )
     db.add(ballot)

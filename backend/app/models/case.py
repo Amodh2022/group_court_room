@@ -58,6 +58,14 @@ class Case(Base):
         UUIDColumn, ForeignKey("offenders.id", ondelete="SET NULL"), nullable=True
     )
 
+    # How petty the plaintiff said it was, 1-3. Multiplies the XP the case
+    # pays out, so the claim is a bet rather than a label.
+    petty_level: Mapped[int] = mapped_column(default=1)
+
+    # Set once, when the game has paid this case out. A retried verdict job
+    # must not pay twice.
+    game_settled_at: Mapped[datetime | None] = mapped_column(TimestampTZ, nullable=True)
+
     generation_attempts: Mapped[int] = mapped_column(default=0)
     failure_reason: Mapped[str | None] = mapped_column(String(120), nullable=True)
 

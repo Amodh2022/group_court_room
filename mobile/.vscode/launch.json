@@ -1,0 +1,17 @@
+{
+  "version": "0.2.0",
+  "configurations": [
+    {
+      "name": "Sue Me (dev)",
+      "request": "launch",
+      "type": "dart",
+      "args": ["--dart-define-from-file=env/dev.env"]
+    },
+    {
+      "name": "Sue Me (prod)",
+      "request": "launch",
+      "type": "dart",
+      "args": ["--dart-define-from-file=env/prod.env"]
+    }
+  ]
+}

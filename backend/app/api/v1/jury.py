@@ -7,6 +7,7 @@ a commitment, or the reveal is worth nothing.
 
 from __future__ import annotations
 
+import logging
 from typing import Annotated
 
 from fastapi import APIRouter, Depends, Path, Query, status
@@ -16,8 +17,11 @@ from app.db.session import get_db
 from app.models import CaseStatus, Verdict
 from app.schemas.case import PublicVerdict
 from app.schemas.jury import JuryRoom, JuryVoteAccepted, JuryVoteCreate
+from app.security.auth import OptionalUser
 from app.security.rate_limit import RateLimit
-from app.services import chat_service, errors, jury_service, serializers
+from app.services import chat_service, errors, game_service, jury_service, serializers
+
+logger = logging.getLogger(__name__)
 
 router = APIRouter(prefix="/jury", tags=["jury"])
 
@@ -43,7 +47,9 @@ def jury_room(token: TokenPath, db: DbDep, voter: VoterQuery = "") -> JuryRoom:
     status_code=status.HTTP_201_CREATED,
     dependencies=[Depends(RateLimit("public_writes"))],
 )
-def cast_vote(token: TokenPath, payload: JuryVoteCreate, db: DbDep) -> JuryVoteAccepted:
+def cast_vote(
+    token: TokenPath, payload: JuryVoteCreate, db: DbDep, juror: OptionalUser = None
+) -> JuryVoteAccepted:
     case = jury_service.resolve_jury_token(db, token)
     ballot = jury_service.cast_vote(
         db,
@@ -51,9 +57,14 @@ def cast_vote(token: TokenPath, payload: JuryVoteCreate, db: DbDep) -> JuryVoteA
         voter_key=payload.voter_key,
         juror_name=payload.juror_name,
         vote=payload.vote,
+        juror_user_id=juror.id if juror else None,
     )
     tally = jury_service.tally_for(db, case)
     chat_service.juror_voted(db, case, payload.juror_name or "A juror", tally.total)
+    try:
+        game_service.on_jury_vote(db, case, user=juror)
+    except Exception:  # pragma: no cover - a ballot is never worth a payout
+        logger.exception("game.jury_vote_failed", extra={"case_id": str(case.id)})
     return JuryVoteAccepted(your_vote=ballot.vote, tally=serializers.jury_tally(tally))
 
 

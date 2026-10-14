@@ -35,7 +35,7 @@ void main() {
       await tester.pumpAndSettle();
 
       // The ruling itself is the screen; the court's working is one tap away.
-      expect(find.text('The Last Pizza Slice'), findsOneWidget);
+      expect(find.text('THE LAST PIZZA SLICE'), findsOneWidget);
       expect(find.text('Alleged food misconduct'), findsOneWidget);
       expect(find.text(testVerdict.sentence), findsOneWidget);
       expect(find.text('“${testVerdict.judgeRoast}”'), findsOneWidget);
@@ -57,14 +57,14 @@ void main() {
 
       final stamp = find.byKey(const Key('verdict-stamp'));
       expect(stamp, findsOneWidget);
-      expect(tester.widget<Text>(stamp).data, 'BOTH GUILTY');
+      expect(tester.widget<Text>(stamp).data, 'Both guilty');
     });
 
     for (final (kind, label) in <(VerdictKind, String)>[
-      (VerdictKind.guilty, 'GUILTY'),
-      (VerdictKind.notGuilty, 'NOT GUILTY'),
-      (VerdictKind.bothGuilty, 'BOTH GUILTY'),
-      (VerdictKind.insufficientEvidence, 'INSUFFICIENT EVIDENCE'),
+      (VerdictKind.guilty, 'Guilty'),
+      (VerdictKind.notGuilty, 'Not guilty'),
+      (VerdictKind.bothGuilty, 'Both guilty'),
+      (VerdictKind.insufficientEvidence, 'Insufficient evidence'),
     ]) {
       testWidgets('stamps $label', (tester) async {
         api.verdict = VerdictState(
@@ -103,8 +103,8 @@ void main() {
       expect(find.textContaining('court.test/verdict'), findsNothing);
       expect(api.shareCalls, 0);
 
-      await scrollTo(tester, find.text('Post to the group chat'));
-      await tester.tap(find.text('Post to the group chat'));
+      await scrollTo(tester, find.text('SHARE THE VERDICT'));
+      await tester.tap(find.text('SHARE THE VERDICT'));
       await tester.pumpAndSettle();
 
       expect(api.shareCalls, 1);
@@ -117,12 +117,12 @@ void main() {
       );
       expect(shares.single['text'], contains(testVerdict.shareCaption));
 
-      await scrollTo(tester, find.text('Revoke'));
-      await tester.tap(find.text('Revoke'));
+      await scrollTo(tester, find.text('REVOKE'));
+      await tester.tap(find.text('REVOKE'));
       await tester.pumpAndSettle();
 
       expect(api.revokeCalls, 1);
-      expect(find.text('Post to the group chat'), findsOneWidget);
+      expect(find.text('SHARE THE VERDICT'), findsOneWidget);
     });
   });
 
@@ -191,6 +191,92 @@ void main() {
 
       expect(find.text('Could not reach the courthouse.'), findsOneWidget);
       expect(find.text('Try again'), findsOneWidget);
+    });
+  });
+
+  group('the rewards card', () {
+    setUp(
+      () => api.verdict = const VerdictState(
+        status: CaseStatus.completed,
+        verdict: testVerdict,
+      ),
+    );
+
+    testWidgets('is absent when the case paid this player nothing', (
+      tester,
+    ) async {
+      await pump(tester);
+      await tester.pumpAndSettle();
+
+      // A juror who called it wrong, or anybody who was not in the case, has
+      // no rows — and an empty rewards card would read as a reward.
+      expect(find.text('YOUR REWARDS'), findsNothing);
+    });
+
+    testWidgets('reads back exactly what the server paid', (tester) async {
+      api.rewards = const CaseRewards(
+        totalXp: 50,
+        totalCoins: 5,
+        items: [
+          Reward(
+            kind: 'jury_first',
+            detail: 'First juror to vote \u00b7 2\u00d7',
+            xp: 50,
+            coins: 5,
+          ),
+        ],
+      );
+      await pump(tester);
+      await tester.pumpAndSettle();
+
+      expect(find.text('YOUR REWARDS'), findsOneWidget);
+      expect(find.text('First juror to vote \u00b7 2\u00d7'), findsOneWidget);
+      expect(find.text('+50 XP'), findsOneWidget);
+      // Nothing is announced that the server did not send.
+      expect(find.byKey(const Key('level-up')), findsNothing);
+    });
+
+    testWidgets('announces a level only when one was reached', (tester) async {
+      api.rewards = const CaseRewards(
+        totalXp: 100,
+        totalCoins: 0,
+        levelReached: 8,
+        items: [
+          Reward(
+            kind: 'case_won',
+            detail: 'You won your case',
+            xp: 100,
+            coins: 0,
+          ),
+        ],
+      );
+      await pump(tester);
+      await tester.pumpAndSettle();
+
+      expect(find.byKey(const Key('level-up')), findsOneWidget);
+      expect(find.text('LEVEL UP \u00b7 LV 8'), findsOneWidget);
+    });
+
+    testWidgets('shows a badge the ruling unlocked', (tester) async {
+      api.rewards = const CaseRewards(
+        totalXp: 0,
+        totalCoins: 15,
+        items: [
+          Reward(
+            kind: 'badge',
+            detail: 'Hung jury',
+            xp: 0,
+            coins: 15,
+            badgeCode: 'hung_jury',
+            badgeName: 'Hung jury',
+          ),
+        ],
+      );
+      await pump(tester);
+      await tester.pumpAndSettle();
+
+      expect(find.textContaining('Badge unlocked:'), findsOneWidget);
+      expect(find.text('+15'), findsOneWidget);
     });
   });
 }

@@ -7,7 +7,7 @@ import '../../../core/models.dart';
 import '../../../core/theme.dart';
 import '../../../core/widgets/court_icons.dart';
 import '../../../core/widgets/court_layout.dart';
-import '../../../core/widgets/court_people.dart';
+import '../../../core/widgets/sue_widgets.dart';
 import '../../../core/widgets/court_widgets.dart';
 import '../../../core/courtroom.dart';
 import '../../auth/data/auth_providers.dart';
@@ -27,22 +27,35 @@ class CaseDetailScreen extends ConsumerWidget {
   Widget build(BuildContext context, WidgetRef ref) {
     final detail = ref.watch(caseDetailProvider(caseId));
     final data = detail.valueOrNull;
+    final me =
+        ref.watch(authControllerProvider).valueOrNull?.displayName ?? 'You';
+
+    final back = RoundIconButton(
+      glyph: CourtGlyph.back,
+      label: 'Back',
+      onTap: () => context.canPop() ? context.pop() : context.go('/'),
+    );
 
     return CourtScaffold(
       title: 'Case file',
+      tablet: _TabletCase(
+        caseId: caseId,
+        detail: detail,
+        me: me,
+        back: back,
+        onDelete: () => _confirmDelete(context, ref),
+      ),
       header: ScreenHeader(
-        title: data?.title ?? 'Case file',
+        title: data == null
+            ? 'Case file'
+            : '$me v. ${data.defendantNickname ?? 'the accused'}',
         eyebrow: data == null
             ? null
             : '${_caseNumber(data.id)} · '
                   '${CaseCategory.byId(data.category).label.toUpperCase()}',
-        titleSize: 26,
-        padding: const EdgeInsets.fromLTRB(16, 18, 16, 10),
-        leading: RoundIconButton(
-          glyph: CourtGlyph.back,
-          label: 'Back',
-          onTap: () => context.canPop() ? context.pop() : context.go('/'),
-        ),
+        titleSize: 24,
+        padding: const EdgeInsets.fromLTRB(20, 18, 20, 12),
+        leading: back,
         trailing: [
           if (data != null) _Countdown(expiresAt: data.expiresAt),
           if (data != null)
@@ -124,6 +137,111 @@ class CaseDetailScreen extends ConsumerWidget {
   }
 }
 
+/// The case file as the tablet artboards draw it: the title row, the charge
+/// and the statements down the main column, and the case's progress, the jury
+/// and the seats beside them once the window is landscape-wide.
+class _TabletCase extends ConsumerWidget {
+  const _TabletCase({
+    required this.caseId,
+    required this.detail,
+    required this.me,
+    required this.back,
+    required this.onDelete,
+  });
+
+  final String caseId;
+  final AsyncValue<CaseDetail> detail;
+  final String me;
+  final Widget back;
+  final VoidCallback onDelete;
+
+  @override
+  Widget build(BuildContext context, WidgetRef ref) {
+    final data = detail.valueOrNull;
+
+    return Column(
+      children: [
+        Expanded(
+          child: SueTabletPage(
+            header: Row(
+              children: [
+                back,
+                const SizedBox(width: 14),
+                Expanded(
+                  child: SueTabletHeader(
+                    title: data == null
+                        ? 'Case file'
+                        : '$me v. ${data.defendantNickname ?? 'the accused'}',
+                    subtitle: data == null
+                        ? null
+                        : '${CaseDetailScreen._caseNumber(data.id)} · '
+                              '${CaseCategory.byId(data.category).label.toUpperCase()}',
+                  ),
+                ),
+                if (data != null) ...[
+                  _Countdown(expiresAt: data.expiresAt),
+                  const SizedBox(width: 10),
+                  RoundIconButton(
+                    glyph: CourtGlyph.trash,
+                    label: 'Delete case',
+                    onTap: onDelete,
+                  ),
+                ],
+              ],
+            ),
+            child: detail.when(
+              loading: () => const _DetailSkeleton(),
+              error: (error, _) => CourtErrorView(
+                message: error is ApiException
+                    ? error.message
+                    : 'Could not open this case file.',
+                onRetry: () => ref.invalidate(caseDetailProvider(caseId)),
+              ),
+              data: (data) => RefreshIndicator(
+                onRefresh: () async =>
+                    ref.refresh(caseDetailProvider(caseId).future),
+                child: ListView(
+                  padding: EdgeInsets.zero,
+                  children: [
+                    SueColumns(
+                      start: [
+                        _Versus(
+                          plaintiff: me,
+                          accused: data.defendantNickname ?? 'The accused',
+                          charge: data.title,
+                        ),
+                        _Statement(
+                          label: 'PLAINTIFF · ${me.toUpperCase()}',
+                          tone: SueTone.blue,
+                          body: data.accusation,
+                        ),
+                        _Defense(
+                          accused: data.defendantNickname ?? 'The accused',
+                          defended: data.defenseSubmitted,
+                        ),
+                        CourtroomPanel(caseId: data.id),
+                      ],
+                      end: [
+                        _Progress(step: CaseDetailScreen._stepFor(data.status)),
+                        _StatusPanel(detail: data),
+                        _JuryTray(detail: data),
+                        if (data.juryTally != null && !data.juryTally!.isEmpty)
+                          _JuryPanel(tally: data.juryTally!),
+                        _SeatPanel(detail: data),
+                      ],
+                    ),
+                  ],
+                ),
+              ),
+            ),
+          ),
+        ),
+        if (data != null) _ActionDock(detail: data),
+      ],
+    );
+  }
+}
+
 /// The yellow countdown chip. Shows nothing at all when the case has no
 /// deadline left to run — an empty clock is worse than no clock.
 class _Countdown extends StatelessWidget {
@@ -136,22 +254,14 @@ class _Countdown extends StatelessWidget {
     if (expiresAt == null) return const SizedBox.shrink();
     final left = expiresAt!.difference(DateTime.now());
     if (left.isNegative) {
-      return const CourtPill(
-        label: 'Closed',
-        glyph: CourtGlyph.clock,
-        fill: CourtColors.lightMistrial,
-        foreground: CourtColors.lightInk,
-        bordered: true,
-      );
+      return const SuePill('CLOSED', tone: SueTone.gray);
     }
     final hours = left.inHours;
     final minutes = left.inMinutes.remainder(60);
-    return CourtPill(
-      label: hours > 0 ? '${hours}h ${minutes}m' : '${minutes}m',
-      glyph: CourtGlyph.clock,
-      fill: CourtColors.yellow,
-      foreground: CourtColors.lightInk,
-      bordered: true,
+    return SuePill(
+      hours > 0 ? '${hours}H ${minutes}M LEFT' : '${minutes}M LEFT',
+      tone: SueTone.orange,
+      round: false,
     );
   }
 }
@@ -177,18 +287,29 @@ class _CaseBody extends ConsumerWidget {
     });
 
     return ListView(
-      padding: const EdgeInsets.fromLTRB(16, 0, 16, 24),
+      padding: const EdgeInsets.fromLTRB(20, 0, 20, 24),
       children: [
-        _Versus(plaintiff: me, accused: accused, charge: detail.accusation),
-        const SizedBox(height: 14),
+        _Versus(plaintiff: me, accused: accused, charge: detail.title),
+        const SizedBox(height: 12),
         _Progress(step: CaseDetailScreen._stepFor(detail.status)),
-        const SizedBox(height: 14),
+        const SizedBox(height: 12),
         // What the court is waiting for sits high: it is the first thing the
         // creator opens the file to find out.
         _StatusPanel(detail: detail),
-        const SizedBox(height: 14),
+        const SizedBox(height: 12),
+        const Text(
+          'Statements',
+          style: TextStyle(fontSize: 20, fontWeight: FontWeight.w600),
+        ),
+        const SizedBox(height: 10),
+        _Statement(
+          label: 'PLAINTIFF · ${me.toUpperCase()}',
+          tone: SueTone.blue,
+          body: detail.accusation,
+        ),
+        const SizedBox(height: 10),
         _Defense(accused: accused, defended: detail.defenseSubmitted),
-        const SizedBox(height: 14),
+        const SizedBox(height: 12),
         _JuryTray(detail: detail),
         const SizedBox(height: 14),
         CourtroomPanel(caseId: detail.id),
@@ -203,7 +324,7 @@ class _CaseBody extends ConsumerWidget {
   }
 }
 
-/// The lit stage: who is suing whom, and what over.
+/// The charge card: who is suing whom, and what over.
 class _Versus extends StatelessWidget {
   const _Versus({
     required this.plaintiff,
@@ -216,156 +337,83 @@ class _Versus extends StatelessWidget {
   final String charge;
 
   @override
-  Widget build(BuildContext context) => StagePanel(
-    semanticLabel: '$plaintiff versus $accused',
-    padding: const EdgeInsets.all(16),
-    child: Column(
-      children: [
-        Row(
-          crossAxisAlignment: CrossAxisAlignment.center,
-          children: [
-            Expanded(
-              child: _Party(
-                name: plaintiff,
-                role: 'PLAINTIFF',
-                roleColor: CourtColors.yellow,
-              ),
-            ),
-            Transform.rotate(
-              angle: -0.105,
-              child: Container(
-                width: 56,
-                height: 56,
-                alignment: Alignment.center,
-                decoration: BoxDecoration(
-                  shape: BoxShape.circle,
-                  color: CourtColors.red,
-                  border: Border.all(color: Colors.black, width: courtBorderWidth),
-                ),
-                child: const Text(
-                  'VS',
-                  style: TextStyle(
-                    fontFamily: courtDisplayFont,
-                    fontWeight: FontWeight.w700,
-                    fontSize: 22,
-                    height: 1,
-                    color: Colors.white,
-                  ),
-                ),
-              ),
-            ),
-            Expanded(
-              child: _Party(
-                name: accused,
-                role: 'ACCUSED',
-                roleColor: CourtColors.pink,
-              ),
-            ),
-          ],
-        ),
-        const SizedBox(height: 14),
-        Container(
-          width: double.infinity,
-          padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 12),
-          decoration: BoxDecoration(
-            color: CourtColors.lightBg,
-            borderRadius: BorderRadius.circular(18),
-            border: Border.all(color: Colors.black, width: courtBorderWidth),
-          ),
-          child: Column(
-            crossAxisAlignment: CrossAxisAlignment.start,
+  Widget build(BuildContext context) => Semantics(
+    label: '$plaintiff versus $accused',
+    child: SueCard(
+      radius: 22,
+      padding: const EdgeInsets.symmetric(horizontal: 20, vertical: 18),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          Row(
             children: [
-              const Text(
-                'THE CHARGE',
-                style: TextStyle(
-                  fontSize: 11,
-                  fontWeight: FontWeight.w900,
-                  letterSpacing: 2,
-                  color: CourtColors.redInk,
+              SizedBox(
+                width: 70,
+                height: 40,
+                child: Stack(
+                  children: [
+                    SueAvatar(
+                      name: plaintiff,
+                      size: 40,
+                      tone: SueTone.blue,
+                      borderColor: context.colors.surfaceContainerHighest,
+                    ),
+                    Positioned(
+                      left: 30,
+                      child: SueAvatar(
+                        name: accused,
+                        size: 40,
+                        tone: SueTone.orange,
+                        borderColor: context.colors.surfaceContainerHighest,
+                      ),
+                    ),
+                  ],
                 ),
               ),
-              const SizedBox(height: 2),
-              Text(
-                charge,
-                style: const TextStyle(
-                  fontFamily: courtDisplayFont,
-                  fontWeight: FontWeight.w600,
-                  fontSize: 21,
-                  height: 1.15,
-                  color: CourtColors.lightInk,
+              const SizedBox(width: 10),
+              Expanded(
+                child: Text.rich(
+                  TextSpan(
+                    text: plaintiff == 'You'
+                        ? 'You are suing '
+                        : '$plaintiff is suing ',
+                    children: [
+                      TextSpan(
+                        text: accused,
+                        style: TextStyle(
+                          fontWeight: FontWeight.w500,
+                          color: context.colors.onSurface,
+                        ),
+                      ),
+                    ],
+                  ),
+                  style: TextStyle(fontSize: 13, color: context.palette.inkDim),
                 ),
               ),
             ],
           ),
-        ),
-      ],
+          const SizedBox(height: 14),
+          Text(
+            'THE CHARGE',
+            style: TextStyle(
+              fontSize: 10,
+              fontWeight: FontWeight.w500,
+              letterSpacing: 1.2,
+              color: context.palette.inkDim,
+            ),
+          ),
+          const SizedBox(height: 4),
+          Text(
+            charge,
+            style: const TextStyle(
+              fontSize: 22,
+              fontWeight: FontWeight.w600,
+              height: 1.25,
+            ),
+          ),
+        ],
+      ),
     ),
-  );
-}
-
-class _Party extends StatelessWidget {
-  const _Party({
-    required this.name,
-    required this.role,
-    required this.roleColor,
-  });
-
-  final String name;
-  final String role;
-  final Color roleColor;
-
-  @override
-  Widget build(BuildContext context) => Column(
-    mainAxisSize: MainAxisSize.min,
-    children: [
-      Container(
-        width: 68,
-        height: 68,
-        alignment: Alignment.center,
-        decoration: BoxDecoration(
-          shape: BoxShape.circle,
-          color: tintFor(name),
-          border: Border.all(color: CourtColors.stageInk, width: 4),
-        ),
-        child: Text(
-          name.trim().isEmpty ? '?' : name.trim()[0].toUpperCase(),
-          style: const TextStyle(
-            fontFamily: courtDisplayFont,
-            fontWeight: FontWeight.w700,
-            fontSize: 30,
-            height: 1,
-            color: CourtColors.lightInk,
-          ),
-        ),
-      ),
-      const SizedBox(height: 6),
-      Padding(
-        padding: const EdgeInsets.symmetric(horizontal: 4),
-        child: Text(
-          name,
-          maxLines: 1,
-          overflow: TextOverflow.ellipsis,
-          textAlign: TextAlign.center,
-          style: const TextStyle(
-            fontFamily: courtDisplayFont,
-            fontWeight: FontWeight.w600,
-            fontSize: 18,
-            height: 1,
-            color: CourtColors.stageInk,
-          ),
-        ),
-      ),
-      const SizedBox(height: 4),
-      Text(
-        role,
-        style: TextStyle(
-          fontSize: 11,
-          fontWeight: FontWeight.w900,
-          letterSpacing: 1,
-          color: roleColor,
-        ),
-      ),
-    ],
   );
 }
 
@@ -381,113 +429,128 @@ class _Progress extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     final palette = context.palette;
+    final blue = palette.accent;
+    final card = context.colors.surfaceContainerHighest;
     return Semantics(
       label: 'Step $step of ${_caseStages.length}: ${_caseStages[step - 1]}',
       child: ExcludeSemantics(
-        child: Row(
-          children: [
-            for (var i = 0; i < _caseStages.length; i++)
-              Expanded(
-                child: Column(
-                  mainAxisSize: MainAxisSize.min,
-                  children: [
-                    if (i + 1 < step)
-                      _Dot(
-                        fill: context.colors.onSurface,
-                        child: CourtIcon(
-                          CourtGlyph.check,
-                          size: 16,
-                          color: context.colors.surface,
-                          strokeWidth: 3.4,
-                        ),
-                      )
-                    else if (i + 1 == step)
-                      _Dot(
-                        fill: CourtColors.yellow,
-                        border: palette.border,
-                        child: Text(
-                          '${i + 1}',
-                          style: const TextStyle(
-                            fontFamily: courtDisplayFont,
-                            fontWeight: FontWeight.w700,
-                            fontSize: 14,
-                            height: 1,
-                            color: CourtColors.lightInk,
+        child: Padding(
+          padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
+          child: Row(
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+              for (var i = 0; i < _caseStages.length; i++)
+                Expanded(
+                  child: LayoutBuilder(
+                    builder: (context, box) => Stack(
+                      clipBehavior: Clip.none,
+                      alignment: Alignment.topCenter,
+                      children: [
+                        // The line to the next step, behind the dots.
+                        if (i < _caseStages.length - 1)
+                          Positioned(
+                            top: 9,
+                            left: box.maxWidth / 2,
+                            width: box.maxWidth,
+                            height: 2,
+                            child: ColoredBox(
+                              color: i + 1 < step ? blue : palette.surfaceAlt2,
+                            ),
                           ),
+                        Column(
+                          mainAxisSize: MainAxisSize.min,
+                          children: [
+                            Container(
+                              width: 20,
+                              height: 20,
+                              decoration: BoxDecoration(
+                                shape: BoxShape.circle,
+                                color: i + 1 < step ? blue : card,
+                                border: i + 1 < step
+                                    ? null
+                                    : Border.all(
+                                        color: i + 1 == step
+                                            ? blue
+                                            : palette.inkFaint,
+                                        width: i + 1 == step ? 5 : 2,
+                                      ),
+                              ),
+                            ),
+                            const SizedBox(height: 6),
+                            Text(
+                              _caseStages[i],
+                              maxLines: 1,
+                              overflow: TextOverflow.ellipsis,
+                              style: TextStyle(
+                                fontSize: 12,
+                                fontWeight: FontWeight.w500,
+                                color: i + 1 > step
+                                    ? palette.inkDim
+                                    : context.colors.onSurface,
+                              ),
+                            ),
+                          ],
                         ),
-                      )
-                    else
-                      _Dot(
-                        fill: Colors.transparent,
-                        border: palette.inkDim,
-                        dashed: true,
-                        child: Text(
-                          '${i + 1}',
-                          style: TextStyle(
-                            fontFamily: courtDisplayFont,
-                            fontWeight: FontWeight.w700,
-                            fontSize: 14,
-                            height: 1,
-                            color: palette.inkDim,
-                          ),
-                        ),
-                      ),
-                    const SizedBox(height: 6),
-                    Text(
-                      _caseStages[i],
-                      maxLines: 1,
-                      overflow: TextOverflow.ellipsis,
-                      style: TextStyle(
-                        fontSize: 12,
-                        fontWeight: i + 1 == step
-                            ? FontWeight.w900
-                            : FontWeight.w800,
-                        color: i + 1 > step
-                            ? palette.inkDim
-                            : context.colors.onSurface,
-                      ),
+                      ],
                     ),
-                  ],
+                  ),
                 ),
-              ),
-          ],
+            ],
+          ),
         ),
       ),
     );
   }
 }
 
-class _Dot extends StatelessWidget {
-  const _Dot({
-    required this.fill,
-    required this.child,
-    this.border,
-    this.dashed = false,
+/// A statement card: tracked label in the speaker's colour, then their words.
+class _Statement extends StatelessWidget {
+  const _Statement({
+    required this.label,
+    required this.tone,
+    required this.body,
+    this.muted = false,
   });
 
-  final Color fill;
-  final Widget child;
-  final Color? border;
-  final bool dashed;
+  final String label;
+  final SueTone tone;
+  final String body;
+  final bool muted;
 
   @override
-  Widget build(BuildContext context) => Container(
-    width: 30,
-    height: 30,
-    alignment: Alignment.center,
-    decoration: BoxDecoration(
-      shape: BoxShape.circle,
-      color: fill,
-      border: border == null
-          ? null
-          : Border.all(color: border!, width: dashed ? 2 : courtBorderWidth),
+  Widget build(BuildContext context) => SizedBox(
+    width: double.infinity,
+    child: SueCard(
+      small: true,
+      radius: 16,
+      padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 14),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          Text(
+            label,
+            style: TextStyle(
+              fontSize: 10,
+              fontWeight: FontWeight.w500,
+              letterSpacing: 1.2,
+              color: tone.fg(context),
+            ),
+          ),
+          const SizedBox(height: 6),
+          Text(
+            body,
+            style: TextStyle(
+              fontSize: 15,
+              height: 1.45,
+              color: muted ? context.palette.inkDim : context.colors.onSurface,
+            ),
+          ),
+        ],
+      ),
     ),
-    child: child,
   );
 }
 
-/// What the other side has put on the record. The charge itself is already
-/// the loudest thing on the stage, so only the answer gets a bubble.
 class _Defense extends StatelessWidget {
   const _Defense({required this.accused, required this.defended});
 
@@ -495,106 +558,15 @@ class _Defense extends StatelessWidget {
   final bool defended;
 
   @override
-  Widget build(BuildContext context) => _Bubble(
-    name: accused,
-    label: 'DEFENSE',
+  Widget build(BuildContext context) => _Statement(
+    label: 'DEFENCE · ${accused.toUpperCase()}',
+    tone: SueTone.orange,
     body: defended
         ? 'Filed. Sealed until the judge rules — the court does not hand '
               'the defense to the plaintiff.'
         : 'Nothing on the record yet. The court is waiting.',
-    mine: false,
     muted: !defended,
   );
-}
-
-class _Bubble extends StatelessWidget {
-  const _Bubble({
-    required this.name,
-    required this.label,
-    required this.body,
-    required this.mine,
-    this.muted = false,
-  });
-
-  final String name;
-  final String label;
-  final String body;
-  final bool mine;
-  final bool muted;
-
-  @override
-  Widget build(BuildContext context) {
-    final palette = context.palette;
-    final avatar = Container(
-      width: 32,
-      height: 32,
-      alignment: Alignment.center,
-      decoration: BoxDecoration(
-        shape: BoxShape.circle,
-        color: tintFor(name),
-        border: Border.all(color: palette.border, width: courtBorderThin),
-      ),
-      child: Text(
-        name.trim().isEmpty ? '?' : name.trim()[0].toUpperCase(),
-        style: const TextStyle(
-          fontFamily: courtDisplayFont,
-          fontWeight: FontWeight.w700,
-          fontSize: 14,
-          height: 1,
-          color: CourtColors.lightInk,
-        ),
-      ),
-    );
-
-    final bubble = Flexible(
-      child: Container(
-        padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 10),
-        decoration: BoxDecoration(
-          color: mine
-              ? context.colors.surfaceContainerHighest
-              : palette.bubble,
-          borderRadius: BorderRadius.only(
-            topLeft: const Radius.circular(20),
-            topRight: const Radius.circular(20),
-            bottomLeft: Radius.circular(mine ? 6 : 20),
-            bottomRight: Radius.circular(mine ? 20 : 6),
-          ),
-          border: Border.all(color: palette.border, width: courtBorderWidth),
-          boxShadow: courtHardShadow(context, dy: 3),
-        ),
-        child: Column(
-          crossAxisAlignment: CrossAxisAlignment.start,
-          mainAxisSize: MainAxisSize.min,
-          children: [
-            Text(
-              label,
-              style: TextStyle(
-                fontSize: 11,
-                fontWeight: FontWeight.w900,
-                letterSpacing: 1,
-                color: palette.inkDim,
-              ),
-            ),
-            Text(
-              body,
-              style: TextStyle(
-                fontSize: 15,
-                fontWeight: FontWeight.w700,
-                height: 1.35,
-                color: muted ? palette.inkDim : context.colors.onSurface,
-              ),
-            ),
-          ],
-        ),
-      ),
-    );
-
-    return Row(
-      crossAxisAlignment: CrossAxisAlignment.end,
-      textDirection: mine ? TextDirection.ltr : TextDirection.rtl,
-      children: [avatar, const SizedBox(width: 8), bubble],
-    );
-  }
 }
 
 /// How full the jury box is. Counts only — the court never says who voted
@@ -608,48 +580,42 @@ class _JuryTray extends StatelessWidget {
   Widget build(BuildContext context) {
     final seated = detail.juryCount;
     final voted = detail.juryTally?.total ?? 0;
-    return Container(
-      padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 12),
-      decoration: BoxDecoration(
-        color: context.palette.surfaceAlt,
-        borderRadius: BorderRadius.circular(courtRadius),
-      ),
+    final shown = seated.clamp(0, 4);
+    final bg = Theme.of(context).colorScheme.surface;
+    return Padding(
+      padding: const EdgeInsets.fromLTRB(4, 4, 4, 0),
       child: Row(
         children: [
           SizedBox(
-            width: seated == 0 ? 0 : 34.0 + 26 * (seated.clamp(1, 4) - 1),
-            height: 34,
+            width: shown == 0 ? 0 : 30.0 + 22 * (shown - 1),
+            height: 30,
             child: Stack(
               children: [
-                for (var i = 0; i < seated.clamp(0, 4); i++)
+                for (var i = 0; i < shown; i++)
                   Positioned(
-                    left: i * 26.0,
+                    left: i * 22.0,
                     child: Container(
-                      width: 34,
-                      height: 34,
+                      width: 30,
+                      height: 30,
                       alignment: Alignment.center,
                       decoration: BoxDecoration(
                         shape: BoxShape.circle,
                         color: i < voted
-                            ? CourtColors.tints[i % CourtColors.tints.length]
+                            ? Color.alphaBlend(SueTone.teal.tint(context), bg)
                             : context.palette.surfaceAlt2,
-                        border: Border.all(
-                          color: context.palette.border,
-                          width: courtBorderThin,
-                        ),
+                        border: Border.all(color: bg, width: 2),
                       ),
                       child: i < voted
                           ? CourtIcon(
                               CourtGlyph.check,
-                              size: 16,
-                              color: CourtColors.lightInk,
-                              strokeWidth: 3.4,
+                              size: 14,
+                              color: SueTone.teal.fg(context),
+                              strokeWidth: 3.2,
                             )
                           : Text(
                               '?',
                               style: TextStyle(
-                                fontWeight: FontWeight.w900,
-                                fontSize: 14,
+                                fontSize: 12,
                                 color: context.palette.inkDim,
                               ),
                             ),
@@ -658,31 +624,37 @@ class _JuryTray extends StatelessWidget {
               ],
             ),
           ),
-          if (seated > 0) const SizedBox(width: 12),
+          if (seated > 0) const SizedBox(width: 14),
           Expanded(
-            child: Column(
-              crossAxisAlignment: CrossAxisAlignment.start,
-              mainAxisSize: MainAxisSize.min,
-              children: [
-                Text(
-                  seated == 0
-                      ? 'No jurors seated yet'
-                      : '$voted of $seated ${seated == 1 ? 'juror has' : 'jurors have'} voted',
-                  style: const TextStyle(
-                    fontWeight: FontWeight.w900,
-                    fontSize: 15,
+            child: seated == 0
+                ? Text(
+                    'No jurors seated yet · votes stay sealed until the judge rules',
+                    style: TextStyle(
+                      fontSize: 13,
+                      color: context.palette.inkDim,
+                    ),
+                  )
+                : Text.rich(
+                    TextSpan(
+                      children: [
+                        TextSpan(
+                          text: '$voted of $seated',
+                          style: TextStyle(
+                            fontWeight: FontWeight.w500,
+                            color: context.colors.onSurface,
+                          ),
+                        ),
+                        TextSpan(
+                          text:
+                              ' ${seated == 1 ? 'juror has' : 'jurors have'} voted · sealed until the ruling',
+                        ),
+                      ],
+                    ),
+                    style: TextStyle(
+                      fontSize: 13,
+                      color: context.palette.inkDim,
+                    ),
                   ),
-                ),
-                Text(
-                  'Votes stay sealed until the judge rules',
-                  style: TextStyle(
-                    fontSize: 12,
-                    fontWeight: FontWeight.w700,
-                    color: context.palette.inkDim,
-                  ),
-                ),
-              ],
-            ),
           ),
         ],
       ),
@@ -701,8 +673,8 @@ class _ActionDock extends ConsumerWidget {
     // The prompt above the key is a question, as on the canvas — not the
     // status again. The status panel higher up already says that.
     final prompt = switch (detail.status) {
-      CaseStatus.draft || CaseStatus.awaitingDefense =>
-        'Has the defendant answered?',
+      CaseStatus.draft ||
+      CaseStatus.awaitingDefense => 'Has the defendant answered?',
       CaseStatus.ready => 'Both sides are in.',
       CaseStatus.generating => 'The judge is deliberating.',
       CaseStatus.completed => 'The court has ruled.',
@@ -710,7 +682,7 @@ class _ActionDock extends ConsumerWidget {
       CaseStatus.expired => 'This case has closed.',
     };
 
-    final (label, glyph, action) = switch (detail.status) {
+    final (label, _, action) = switch (detail.status) {
       CaseStatus.draft || CaseStatus.awaitingDefense => (
         'Check for a defense',
         CourtGlyph.refresh,
@@ -751,14 +723,14 @@ class _ActionDock extends ConsumerWidget {
             prompt,
             maxLines: 1,
             overflow: TextOverflow.ellipsis,
-            style: const TextStyle(
-              fontFamily: courtDisplayFont,
-              fontWeight: FontWeight.w600,
-              fontSize: 16,
+            style: TextStyle(
+              fontWeight: FontWeight.w500,
+              fontSize: 15,
+              color: context.palette.inkDim,
             ),
           ),
-          const SizedBox(height: 10),
-          CourtKey(label: label, glyph: glyph, onPressed: action),
+          const SizedBox(height: 12),
+          SueButton(label: label, height: 56, onPressed: action),
         ],
       ),
     );
@@ -829,7 +801,9 @@ class _SeatPanelState extends ConsumerState<_SeatPanel> {
             runSpacing: 10,
             children: [
               SizedBox(
-                width: 160,
+                // Wide enough for the glyph and the label at the tracked
+                // weight the key sets; at 160 both read as "Add a jur…".
+                width: 186,
                 child: CourtKey(
                   label: 'Add a juror',
                   glyph: CourtGlyph.person,
@@ -839,7 +813,7 @@ class _SeatPanelState extends ConsumerState<_SeatPanel> {
               ),
               if (!widget.detail.defenseSubmitted)
                 SizedBox(
-                  width: 180,
+                  width: 224,
                   child: CourtKey(
                     label: 'Name the accused',
                     glyph: CourtGlyph.plus,
@@ -898,40 +872,45 @@ class _StatusPanel extends StatelessWidget {
   Widget build(BuildContext context) {
     final color = detail.status.color(context);
 
-    return CourtCard(
-      padding: const EdgeInsets.all(16),
-      child: Column(
-        crossAxisAlignment: CrossAxisAlignment.start,
-        children: [
-          Row(
-            children: [
-              Container(
-                width: 10,
-                height: 10,
-                decoration: BoxDecoration(
-                  shape: BoxShape.circle,
-                  color: color,
+    return SizedBox(
+      width: double.infinity,
+      child: SueCard(
+        small: true,
+        radius: 18,
+        padding: const EdgeInsets.all(16),
+        child: Column(
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            Row(
+              children: [
+                Container(
+                  width: 10,
+                  height: 10,
+                  decoration: BoxDecoration(
+                    shape: BoxShape.circle,
+                    color: color,
+                  ),
                 ),
-              ),
-              const SizedBox(width: 8),
-              Expanded(
-                child: Text(
-                  detail.status.label,
-                  maxLines: 1,
-                  overflow: TextOverflow.ellipsis,
-                  style: context.text.titleMedium?.copyWith(color: color),
+                const SizedBox(width: 8),
+                Expanded(
+                  child: Text(
+                    detail.status.label,
+                    maxLines: 1,
+                    overflow: TextOverflow.ellipsis,
+                    style: context.text.titleMedium?.copyWith(color: color),
+                  ),
                 ),
-              ),
-            ],
-          ),
-          const SizedBox(height: 10),
-          Text(
-            _explanation(detail),
-            style: context.text.bodyMedium?.copyWith(
-              color: context.palette.inkDim,
+              ],
             ),
-          ),
-        ],
+            const SizedBox(height: 10),
+            Text(
+              _explanation(detail),
+              style: context.text.bodyMedium?.copyWith(
+                color: context.palette.inkDim,
+              ),
+            ),
+          ],
+        ),
       ),
     );
   }
